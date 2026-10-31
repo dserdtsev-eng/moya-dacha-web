@@ -518,14 +518,13 @@ function renderQRVznos(area, plot, totalDebt) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             qrTarget.innerHTML = ''; // Очистка
-            new QRCode(qrTarget, {
-                text: qrData,
-                width: 240,
-                height: 240,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.L
-            });
+            new QRCode(            // Новая библиотека qrcode-generator
+            const qr = qrcode(0, 'L');
+            qr.addData(qrData);
+            qr.make();
+            // Создаем картинку и вставляем в контейнер
+            qrTarget.innerHTML = qr.createImgTag(5, 10); // 5 - размер модуля, 10 - отступ
+            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target'););
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
     }, 200); // Увеличили задержку до 200 мс
@@ -593,14 +592,13 @@ function renderQRElectro(area, plot, summary) {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
                 qrTarget.innerHTML = ''; // Очистка перед новой отрисовкой
-                new QRCode(qrTarget, {
-                    text: qrData,
-                    width: 240,
-                    height: 240,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.L
-                });
+                new QRCode(            // Новая библиотека qrcode-generator
+            const qr = qrcode(0, 'L');
+            qr.addData(qrData);
+            qr.make();
+            // Создаем картинку и вставляем в контейнер
+            qrTarget.innerHTML = qr.createImgTag(5, 10); // 5 - размер модуля, 10 - отступ
+            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target'););
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
         }, 200); // Увеличили задержку
