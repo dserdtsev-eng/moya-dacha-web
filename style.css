@@ -1,206 +1,121 @@
 :root {
-    --primary: #2e7d32;
-    --bg: #f5f5f5;
-    --card-bg: #ffffff;
+    --primary: #007ba3; /* Цвет как на скриншотах */
+    --bg: #ffffff;
     --text: #333;
+    --text-light: #666;
     --error: #d32f2f;
-    --success: #2e7d32;
-    --warning: #f57c00;
-    --border: #e0e0e0;
+    --success: #007ba3;
+    --card-bg: #e0e5ec; /* Серо-голубой фон карточек */
+    --card-blue: #c1e2f0; /* Голубой фон для акцентов */
+    --border: #ccc;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.4;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.screen { display: none; padding: 20px; max-width: 600px; margin: 0 auto; }
-.screen.active { display: block; }
+.screen { display: none; padding: 20px; max-width: 600px; margin: 0 auto; height: 100vh; overflow-y: auto; }
+.screen.active { display: flex; flex-direction: column; }
 
 /* Экран загрузки */
-#loading { text-align: center; padding-top: 100px; }
+#loading { align-items: center; justify-content: center; }
 .spinner {
     width: 40px; height: 40px;
-    border: 4px solid #ccc;
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 20px;
+    border: 4px solid #ccc; border-top-color: var(--primary);
+    border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Экран входа */
-#login-screen h1 { text-align: center; color: var(--primary); margin-bottom: 5px; }
-.subtitle { text-align: center; color: #777; margin-bottom: 30px; }
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-.form-group select, .form-group input {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 16px;
-    background: white;
+#login-screen { padding-top: 50px; }
+.main-title {
+    text-align: center; color: var(--primary); font-size: 32px; font-weight: bold; margin-bottom: 5px;
 }
-button {
-    width: 100%;
-    padding: 14px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: opacity 0.15s;
+.subtitle {
+    text-align: center; color: var(--text-light); font-size: 20px; margin-bottom: 40px;
 }
-button:hover { opacity: 0.9; }
-button:disabled { background: #ccc; cursor: not-allowed; }
-.error { color: var(--error); text-align: center; margin-top: 10px; font-size: 14px; }
-
-/* Дашборд */
-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    gap: 10px;
+.form-group.outlined {
+    position: relative; margin-bottom: 20px;
 }
-header h2 { font-size: 18px; word-break: break-word; }
-#logout-btn {
-    width: auto;
-    padding: 8px 15px;
-    background: #eee;
-    color: var(--text);
-    font-size: 14px;
-    flex-shrink: 0;
+.form-group.outlined label {
+    position: absolute; top: -10px; left: 15px; background: var(--bg);
+    padding: 0 5px; font-size: 14px; color: var(--text-light);
 }
-#logout-btn:hover { background: #ddd; }
-
-.tabs {
-    display: flex;
-    overflow-x: auto;
-    gap: 5px;
-    margin-bottom: 15px;
-    padding-bottom: 5px;
-    -webkit-overflow-scrolling: touch;
+.form-group.outlined select,
+.form-group.outlined input {
+    width: 100%; padding: 16px 15px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 18px; background: transparent; outline: none;
 }
-.tab-btn {
-    width: auto;
-    padding: 8px 12px;
-    background: white;
-    color: var(--text);
-    border: 1px solid var(--border);
-    white-space: nowrap;
-    font-size: 14px;
-    font-weight: normal;
-}
-.tab-btn.active {
-    background: var(--primary);
-    color: white;
+.form-group.outlined select:focus,
+.form-group.outlined input:focus {
     border-color: var(--primary);
-    font-weight: bold;
 }
+.checkbox-group {
+    display: flex; align-items: center; margin-bottom: 25px; font-size: 16px;
+}
+.checkbox-group input {
+    width: 24px; height: 24px; margin-right: 10px; accent-color: var(--primary);
+}
+.btn-pill {
+    width: 100%; padding: 16px; background: var(--primary); color: white;
+    border: none; border-radius: 30px; font-size: 18px; font-weight: bold; cursor: pointer;
+    transition: opacity 0.2s;
+}
+.btn-pill:disabled { background: #e0e0e0; color: #999; cursor: not-allowed; }
+.btn-pill:not(:disabled):hover { opacity: 0.9; }
+.error { color: var(--error); text-align: center; margin-top: 10px; font-size: 14px; }
+.hint { text-align: center; color: var(--text-light); }
 
-/* Карточки */
+/* Шапка дашборда */
+.app-header {
+    display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;
+}
+.header-info h2 { font-size: 20px; font-weight: bold; }
+.header-info p { font-size: 16px; color: var(--text-light); }
+.header-actions { display: flex; align-items: center; gap: 10px; }
+.btn-icon { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--primary); }
+.btn-text { background: none; border: none; font-size: 16px; color: var(--error); cursor: pointer; font-weight: bold; }
+
+/* Вкладки */
+.tabs {
+    display: flex; overflow-x: auto; gap: 15px; margin-bottom: 20px; padding-bottom: 5px;
+    border-bottom: 1px solid #eee; -webkit-overflow-scrolling: touch;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab-btn {
+    background: none; border: none; padding: 8px 0; color: var(--primary);
+    font-size: 18px; font-weight: bold; white-space: nowrap; cursor: pointer;
+    border-bottom: 3px solid transparent;
+}
+.tab-btn.active { border-bottom-color: var(--primary); }
+
+/* Контент */
+.tab-content { flex: 1; }
+h3 { font-size: 20px; margin-bottom: 15px; font-weight: bold; }
+
 .card {
-    background: var(--card-bg);
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 15px;
 }
-.card h3 {
-    margin-bottom: 10px;
-    font-size: 16px;
-    color: var(--primary);
-}
-.card p { font-size: 14px; }
-.card small { font-size: 12px; }
+.card-blue { background: var(--card-blue); }
+.card-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
 
-.row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #eee;
-    font-size: 14px;
-    gap: 10px;
-}
-.row:last-child { border-bottom: none; }
-.row span:first-child { color: #555; }
-.row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-.row.total {
-    font-weight: bold;
-    margin-top: 10px;
-    padding-top: 12px;
-    border-top: 2px solid var(--primary);
-    font-size: 16px;
+.row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 18px; }
+.row.total { font-weight: bold; font-size: 22px; margin-top: 10px; }
+.row span:last-child { font-weight: bold; }
+
+/* Кнопки в карточках */
+.btn-calc {
+    width: 100%; padding: 12px; background: var(--primary); color: white;
+    border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 15px; cursor: pointer;
 }
 
-.success {
-    color: var(--success);
-    font-weight: bold;
-    text-align: center;
-    padding: 20px;
-    font-size: 15px;
-}
-.warning {
-    color: var(--warning);
-    font-weight: bold;
-    padding: 10px;
-    background: #fff3e0;
-    border-radius: 6px;
-    font-size: 13px;
-    margin-bottom: 10px;
-}
-
-/* Формы в дашборде */
-.form-group input[type="number"],
-.form-group input[type="text"] {
-    font-size: 18px;
-    padding: 14px;
-    font-variant-numeric: tabular-nums;
-}
-#calc-btn { margin-top: 5px; }
-
-/* QR-контейнер */
-#qr-container, #debt-qr {
-    text-align: center;
-    margin-top: 15px;
-    padding: 15px;
-    background: white;
-    border-radius: 8px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 0;
-}
-#qr-container img,
-#qr-container canvas,
-#debt-qr img,
-#debt-qr canvas {
-    max-width: 100%;
-    height: auto;
-    display: block;
-}
-
-/* Мобильная адаптация */
-@media (max-width: 480px) {
-    .screen { padding: 15px; }
-    .tabs { gap: 4px; }
-    .tab-btn { padding: 7px 10px; font-size: 13px; }
-    .card { padding: 12px; }
-    .row { font-size: 13px; }
-    .row.total { font-size: 15px; }
-}
-
-/* Мелкий текст */
-.hint {
-    font-size: 12px;
-    color: #777;
-    margin-top: 6px;
-    line-height: 1.4;
+/* Поля ввода на вкладках */
+.input-large {
+    width: 100%; padding: 15px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 20px; margin-top: 10px; text-align: center;
 }
