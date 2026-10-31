@@ -586,7 +586,7 @@ function renderQRElectro(area, plot, summary) {
         sumDiv.textContent = formatMoney(sum);
         qrBlock.style.display = 'block';
 
-        const purpose = `${plot.street} ${plot.house}, электроэнергия`;
+        const purpose = `${plot.street} ${plot.house}, электроэнергия, показание: ${val}`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
         setTimeout(() => {
