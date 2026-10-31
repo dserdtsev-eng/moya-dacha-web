@@ -5,7 +5,6 @@ const JSON_FILE = 'snt_data.json';
 
 let appData = null;
 let currentPlot = null;
-let qrInstance = null; // Для хранения текущего QR
 
 // ─── УТИЛИТЫ ───
 async function pbkdf2(password, saltBase64) {
@@ -35,24 +34,42 @@ function formatDateRu(dateStr) {
 }
 
 // ─── ЗАГРУЗКА ДАННЫХ ───
-async function loadData() {
+async function loadData(isRefresh = false) {
+    if (!isRefresh) showScreen('loading');
     try {
         const url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/${JSON_FILE}?t=${Date.now()}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error('Не удалось скачать базу');
         appData = await response.json();
-        initLoginScreen();
-        showScreen('login-screen');
         
-        // Восстановление сессии
-        const savedPlotId = localStorage.getItem('snt_plot_id');
-        if (savedPlotId && document.getElementById('remember-me').checked) {
-            document.getElementById('street-select').value = appData.plots[savedPlotId].street;
-            document.getElementById('street-select').dispatchEvent(new Event('change'));
-            document.getElementById('house-select').value = savedPlotId;
+        if (isRefresh && currentPlot) {
+            // Обновляем данные текущего участка без выхода на экран логина
+            currentPlot.data = appData.plots[currentPlot.id];
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if (btn.classList.contains('active')) {
+                    renderTab(btn.dataset.tab);
+                }
+            });
+            // Короткое уведомление об обновлении
+            const toast = document.createElement('div');
+            toast.textContent = 'Данные обновлены';
+            toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--primary);color:white;padding:10px 20px;border-radius:20px;z-index:1000;';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        } else {
+            initLoginScreen();
+            showScreen('login-screen');
+            
+            const savedPlotId = localStorage.getItem('snt_plot_id');
+            if (savedPlotId && appData.plots[savedPlotId]) {
+                document.getElementById('street-select').value = appData.plots[savedPlotId].street;
+                document.getElementById('street-select').dispatchEvent(new Event('change'));
+                document.getElementById('house-select').value = savedPlotId;
+            }
         }
     } catch (e) {
-        alert('Ошибка загрузки данных: ' + e.message);
+        if (!isRefresh) alert('Ошибка загрузки данных: ' + e.message);
+        else alert('Не удалось обновить данные: ' + e.message);
     }
 }
 
@@ -230,12 +247,10 @@ function getElectricSummary(plot) {
     const readings = plot.meter_readings || [];
     const lastRepl = getLastReplacementDate(plot);
     
-    // Берем показания после замены
     const relevantReadings = readings.filter(r => !lastRepl || (r.date || '') >= lastRepl).sort((a,b) => (a.date||'').localeCompare(b.date||''));
     const lastReading = relevantReadings[relevantReadings.length - 1];
     const lastVal = lastReading ? Number(lastReading.values["1"] || 0) : 0;
 
-    // Считаем расход по дельтам
     let consumed = 0;
     for (let i = 1; i < relevantReadings.length; i++) {
         if (!relevantReadings[i].replaced) {
@@ -245,14 +260,12 @@ function getElectricSummary(plot) {
         }
     }
 
-    // Считаем оплачено кВт*ч
     let paidKwh = 0;
     const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
     for (const p of (appData.payments || [])) {
         if (String(p.plot) !== String(plot.id) || !isElectricPayment(p.description)) continue;
         if (lastRepl && p.date < lastRepl) continue;
         
-        // Ищем тариф на дату платежа
         let tPrice = 0;
         for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
         if (tPrice > 0) paidKwh += (Number(p.amount) / tPrice);
@@ -266,9 +279,6 @@ function renderTab(tab) {
     const plotId = currentPlot.id;
     const plot = currentPlot.data;
     const settings = appData.settings;
-
-    // Сбрасываем текущий QR при смене вкладки
-    qrInstance = null;
 
     if (tab === 'debts') {
         const totalDebt = getTotalDebt(plot, plotId);
@@ -347,7 +357,6 @@ function renderTab(tab) {
         let html = '<h3>Электричество</h3>';
         html += `<div style="color: var(--text-light); margin-bottom: 15px;">Период: с ${lastRepl ? formatDateRu(lastRepl) : 'начала'} (после замены счётчика)</div>`;
 
-        // Баланс
         html += `<div class="card">
             <h4 style="font-size: 18px; margin-bottom: 15px;">Баланс</h4>
             <div class="row"><span>Оплачено, кВт·ч</span><span>${summary.paidKwh.toFixed(1)}</span></div>
@@ -357,7 +366,6 @@ function renderTab(tab) {
             </div>
         </div>`;
 
-        // История оплаченных кВт*ч
         html += `<h4 style="font-size: 18px; margin-top: 25px; margin-bottom: 15px;">Оплаченные кВт·ч</h4>`;
         const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
         const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a,b) => b.date.localeCompare(a.date));
@@ -372,7 +380,7 @@ function renderTab(tab) {
                 html += `<div class="card">
                     <div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(p.date)}</div>
                     <div class="row" style="padding:0;">
-                        <div style="font-size: 14px; color: var(--text-light);">${formatMoney(p.amount)} ÷ ${tPrice.toFixed(2)} ₽/кВт·ч</div>
+                        <div style="font-size: 14px; color: var(--text-light);">${formatMoney(p.amount)} ÷ ${Number(tPrice).toFixed(2)} ₽/кВт·ч</div>
                         <span style="font-size: 20px; font-weight: bold;">${kwh}</span>
                     </div>
                 </div>`;
@@ -448,9 +456,7 @@ function renderQRTab(plot, plotId, content) {
     const btnElectro = document.getElementById('qr-btn-electro');
     const area = document.getElementById('qr-content-area');
 
-    // Функция переключения вкладок внутри QR
     function setActiveTab(isVznos) {
-        qrInstance = null;
         if (isVznos) {
             btnVznos.style.background = 'var(--primary)';
             btnVznos.style.color = 'white';
@@ -473,7 +479,6 @@ function renderQRTab(plot, plotId, content) {
     btnVznos.onclick = () => setActiveTab(true);
     btnElectro.onclick = () => setActiveTab(false);
 
-    // По умолчанию открываем взносы
     setActiveTab(true);
 }
 
@@ -501,7 +506,7 @@ function renderQRVznos(area, plot, totalDebt) {
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
             <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
-            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white;">💾 Сохранить QR в галерею</button>
+            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
 
@@ -511,13 +516,12 @@ function renderQRVznos(area, plot, totalDebt) {
     setTimeout(() => {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
-            qrInstance = new QRCode(qrTarget, {
+            new QRCode(qrTarget, {
                 text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
             });
+            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
-    }, 50);
-
-    document.getElementById('save-qr-btn').onclick = () => saveQRToGallery();
+    }, 100);
 }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
@@ -545,7 +549,7 @@ function renderQRElectro(area, plot, summary) {
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
             <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
-            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white;">💾 Сохранить QR в галерею</button>
+            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
 
@@ -564,7 +568,6 @@ function renderQRElectro(area, plot, summary) {
             sumDiv.textContent = '0,00 ₽';
             errDiv.style.display = val > 0 ? 'block' : 'none';
             qrBlock.style.display = 'none';
-            qrInstance = null;
             return;
         }
 
@@ -583,14 +586,13 @@ function renderQRElectro(area, plot, summary) {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
                 qrTarget.innerHTML = '';
-                qrInstance = new QRCode(qrTarget, {
+                new QRCode(qrTarget, {
                     text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
                 });
+                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
-        }, 50);
+        }, 100);
     };
-
-    document.getElementById('save-qr-btn').onclick = () => saveQRToGallery();
 }
 
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
@@ -610,29 +612,34 @@ function buildPaymentQR(plot, amount, purpose) {
     ].join('|');
 }
 
-function saveQRToGallery() {
-    if (!qrInstance) return;
-    // В qrcodejs картинка рендерится в <canvas> или <img>. Ищем её.
-    const qrTarget = document.getElementById('qr-target');
-    const img = qrTarget.querySelector('img');
-    const canvas = qrTarget.querySelector('canvas');
+function saveQRToGallery(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
     
+    const canvas = container.querySelector('canvas');
+    const img = container.querySelector('img');
+
     let dataUrl = '';
-    if (img && img.src) {
-        dataUrl = img.src;
-    } else if (canvas) {
+    // Если библиотека отрисовала canvas (в современных браузерах) - берем его
+    if (canvas) {
         dataUrl = canvas.toDataURL("image/png");
+    } 
+    // Если отрисовала img (в некоторых браузерах)
+    else if (img && img.src) {
+        dataUrl = img.src;
     }
 
-    if (!dataUrl) {
-        alert('Не удалось сохранить QR');
+    if (!dataUrl || dataUrl === 'data:,') {
+        alert('QR-код ещё не сгенерирован. Подождите секунду и попробуйте снова.');
         return;
     }
 
-    // Создаем ссылку для скачивания
+    // Создаем виртуальную ссылку для скачивания
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `QR_СНТ_${currentPlot.data.street}_${currentPlot.data.house}.png`;
+    const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
+    const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
+    a.download = `QR_${street}_${house}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -647,11 +654,16 @@ document.getElementById('logout-btn').onclick = () => {
 };
 
 document.getElementById('refresh-btn').onclick = () => {
-    location.reload();
+    loadData(true); // true = обновить без выхода на экран логина
 };
 
 document.getElementById('info-btn').onclick = () => {
-    alert(`СНТ «Надежда»\n\nСайт: https://${GITHUB_USER}.github.io/${GITHUB_REPO}/\n\nЕсли что-то не работает — обратитесь к председателю.`);
+    alert(`Моя дача — СНТ «Надежда»\n\n` + 
+          `Веб-версия личного кабинета садовода.\n\n` +
+          `Вкладки «Долги», «Платежи» и «Показания» показывают данные из базы СНТ.\n\n` +
+          `Вкладка «Электро» отображает баланс кВт·ч.\n\n` +
+          `Вкладка «QR» позволяет рассчитать сумму и сформировать QR-код для оплаты взносов или электроэнергии через приложение банка.\n\n` +
+          `Если у вас возникли вопросы, обратитесь к председателю СНТ.`);
 };
 
 // ─── СТАРТ ───
