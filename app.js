@@ -309,15 +309,26 @@ function renderQR(containerId, qrString) {
     const container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML = '';
+    
     if (!qrString) {
-        container.innerHTML = '<p class="error" style="text-align:center;">Реквизиты СНТ не заполнены.</p>';
+        container.innerHTML = '<p class="error" style="text-align:center;">Реквизиты СНТ не заполнены в базе.</p>';
         return;
     }
     if (typeof QRCode === 'undefined') {
-        container.innerHTML = '<p class="error" style="text-align:center;">Библиотека QR не загрузилась</p>';
+        container.innerHTML = '<p class="error" style="text-align:center;">Библиотека QR не загрузилась. Проверьте интернет.</p>';
         return;
     }
-    new QRCode(container, { text: qrString, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+    
+    try {
+        new QRCode(container, { 
+            text: qrString, 
+            width: 200, 
+            height: 200, 
+            correctLevel: QRCode.CorrectLevel.M 
+        });
+    } catch (e) {
+        container.innerHTML = `<p class="error" style="text-align:center;">Ошибка генерации: ${e.message}</p>`;
+    }
 }
 
 // ─── РЕНДЕР ВКЛАДОК ───
