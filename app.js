@@ -43,14 +43,12 @@ async function loadData(isRefresh = false) {
         appData = await response.json();
         
         if (isRefresh && currentPlot) {
-            // Обновляем данные текущего участка без выхода на экран логина
             currentPlot.data = appData.plots[currentPlot.id];
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 if (btn.classList.contains('active')) {
                     renderTab(btn.dataset.tab);
                 }
             });
-            // Короткое уведомление об обновлении
             const toast = document.createElement('div');
             toast.textContent = 'Данные обновлены';
             toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--primary);color:white;padding:10px 20px;border-radius:20px;z-index:1000;';
@@ -389,10 +387,6 @@ function renderTab(tab) {
         content.innerHTML = html;
     }
 
-    else if (tab === 'qr') {
-        renderQRTab(plot, plotId, content);
-    }
-
     else if (tab === 'deadlines') {
         const feeStart = settings.fee_start_date || '—';
         const feeEnd = feeStart !== '—' ? addYearMinusDay(feeStart) : '—';
@@ -427,6 +421,10 @@ function renderTab(tab) {
         </div>`;
 
         content.innerHTML = html;
+    }
+
+    else if (tab === 'qr') {
+        renderQRTab(plot, plotId, content);
     }
 }
 
@@ -517,15 +515,16 @@ function renderQRVznos(area, plot, totalDebt) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             qrTarget.innerHTML = '';
-            const qr = qrcode(0, 'L');
-            qr.addData(qrData);
-            qr.make();
-            qrTarget.innerHTML = qr.createImgTag(5, 10);
+            new QRCode(qrTarget, {
+                text: qrData,
+                width: 240,
+                height: 240,
+                correctLevel: QRCode.CorrectLevel.M
+            });
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
-    }, 200);
+    }, 100);
 }
-
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
 function renderQRElectro(area, plot, summary) {
     const today = todayStr();
@@ -588,13 +587,15 @@ function renderQRElectro(area, plot, summary) {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
                 qrTarget.innerHTML = '';
-                const qr = qrcode(0, 'L');
-                qr.addData(qrData);
-                qr.make();
-                qrTarget.innerHTML = qr.createImgTag(5, 10);
+                new QRCode(qrTarget, {
+                    text: qrData,
+                    width: 240,
+                    height: 240,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
-        }, 200);
+        }, 100);
     };
 }
 
@@ -602,28 +603,30 @@ function renderQRElectro(area, plot, summary) {
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
-    // Обрезаем длинные строки, чтобы не превышать лимит QR-кода
-    const shortName = (req.name || 'СНТ').substring(0, 20);
-    const shortBank = (req.bank_name || 'Банк').substring(0, 20);
-    const shortPurpose = purpose.substring(0, 30);
+    // Функция для безопасного кодирования значений
+    // (убирает запрещенные символы | и =, кодирует кириллицу в UTF-8 %D0...)
+    const encodeValue = (val) => {
+        if (!val) return '';
+        return encodeURIComponent(String(val).replace(/\|/g, ' ').replace(/=/g, ' ').trim());
+    };
 
-    const qrString = [
+    const parts = [
         'ST00012',
-        'Name=' + shortName,
-        'PersonalAcc=' + (req.personal_acc || ''),
-        'BankName=' + shortBank,
-        'BIC=' + (req.bic || ''),
-        'CorrespAcc=' + (req.corresp_acc || ''),
-        'PayeeINN=' + (req.inn || ''),
-        'KPP=' + (req.kpp || ''),
+        'Name=' + encodeValue(req.name || 'СНТ НАДЕЖДА'),
+        'PersonalAcc=' + encodeValue(req.personal_acc || ''),
+        'BankName=' + encodeValue(req.bank_name || ''),
+        'BIC=' + encodeValue(req.bic || ''),
+        'CorrespAcc=' + encodeValue(req.corr_acc || req.corresp_acc || ''),
+        'PayeeINN=' + encodeValue(req.inn || ''),
+        'KPP=' + encodeValue(req.kpp || ''),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + shortPurpose
-    ].join('|');
-
-    // Выводим в консоль то, что сгенерировалось
+        'Purpose=' + encodeValue(purpose)
+    ];
+    
+    const qrString = parts.join('|');
     console.log("Длина строки QR:", qrString.length);
     console.log("QR СТРОКА:", qrString);
-
+    
     return qrString;
 }
 
@@ -631,9 +634,7 @@ function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
-    // Ищем canvas (основной вариант отрисовки)
     const canvas = container.querySelector('canvas');
-    // На всякий случай ищем img (запасной вариант)
     const img = container.querySelector('img');
 
     let dataUrl = '';
@@ -642,7 +643,6 @@ function saveQRToGallery(containerId) {
     } else if (img && img.src && img.src.startsWith('data:image')) {
         dataUrl = img.src;
     } else if (img && img.src) {
-        // Если img.src это blob или что-то еще, попробуем нарисовать на холсте
         try {
             const c = document.createElement('canvas');
             c.width = img.naturalWidth || img.width || 240;
@@ -679,7 +679,7 @@ document.getElementById('logout-btn').onclick = () => {
 };
 
 document.getElementById('refresh-btn').onclick = () => {
-    loadData(true); // true = обновить без выхода на экран логина
+    loadData(true);
 };
 
 document.getElementById('info-btn').onclick = () => {
