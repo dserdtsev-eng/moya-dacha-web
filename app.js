@@ -62,17 +62,7 @@ function initLoginScreen() {
         streetSelect.innerHTML += `<option value="${s}">${s}</option>`;
     });
 
-    const savedStreet = localStorage.getItem('snt_street');
-    const savedHouse = localStorage.getItem('snt_house');
-    if (savedStreet) {
-        streetSelect.value = savedStreet;
-        streetSelect.onchange();
-        if (savedHouse) {
-            houseSelect.value = savedHouse;
-            checkForm();
-        }
-    }
-
+    // 1. Сначала назначаем обработчики
     streetSelect.onchange = () => {
         const selectedStreet = streetSelect.value;
         houseSelect.innerHTML = '<option value=""></option>';
@@ -125,6 +115,22 @@ function initLoginScreen() {
             errEl.textContent = 'Ошибка проверки пароля';
         }
     };
+
+    // 2. Только ТЕПЕРЬ восстанавливаем сохранённый выбор
+    const savedStreet = localStorage.getItem('snt_street');
+    const savedHouse = localStorage.getItem('snt_house');
+    if (savedStreet) {
+        streetSelect.value = savedStreet;
+        // Вызываем onchange вручную, чтобы наполнить список домов
+        if (typeof streetSelect.onchange === 'function') {
+            streetSelect.onchange();
+        }
+        
+        if (savedHouse) {
+            houseSelect.value = savedHouse;
+            checkForm();
+        }
+    }
 }
 
 // ─── ДАШБОРД ───
