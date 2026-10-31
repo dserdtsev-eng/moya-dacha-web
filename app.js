@@ -524,7 +524,7 @@ function renderQRVznos(area, plot, totalDebt) {
                 height: 240,
                 colorDark : "#000000",
                 colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.M
+                correctLevel : QRCode.CorrectLevel.L
             });
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
@@ -599,7 +599,7 @@ function renderQRElectro(area, plot, summary) {
                     height: 240,
                     colorDark : "#000000",
                     colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.M
+                    correctLevel : QRCode.CorrectLevel.L
                 });
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
@@ -610,19 +610,30 @@ function renderQRElectro(area, plot, summary) {
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
-    console.log("QR СТРОКА:", ['ST00012', 'Name=' + (req.name || 'СНТ НАДЕЖДА'), 'PersonalAcc=' + (req.personal_acc || ''), 'BankName=' + (req.bank_name || ''), 'BIC=' + (req.bic || ''), 'CorrespAcc=' + (req.corresp_acc || ''), 'PayeeINN=' + (req.inn || ''), 'KPP=' + (req.kpp || ''), 'Sum=' + Math.round(amount * 100), 'Purpose=' + purpose].join('|'));
-    return [
+    
+    // Обрезаем длинные строки, чтобы не превышать лимит QR-кода
+    const shortName = (req.name || 'СНТ').substring(0, 20);
+    const shortBank = (req.bank_name || 'Банк').substring(0, 20);
+    const shortPurpose = purpose.substring(0, 30);
+
+    const qrString = [
         'ST00012',
-        'Name=' + (req.name || 'СНТ НАДЕЖДА'),
+        'Name=' + shortName,
         'PersonalAcc=' + (req.personal_acc || ''),
-        'BankName=' + (req.bank_name || ''),
+        'BankName=' + shortBank,
         'BIC=' + (req.bic || ''),
         'CorrespAcc=' + (req.corresp_acc || ''),
         'PayeeINN=' + (req.inn || ''),
         'KPP=' + (req.kpp || ''),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + purpose
+        'Purpose=' + shortPurpose
     ].join('|');
+
+    // Выводим в консоль то, что сгенерировалось
+    console.log("Длина строки QR:", qrString.length);
+    console.log("QR СТРОКА:", qrString);
+
+    return qrString;
 }
 
 function saveQRToGallery(containerId) {
