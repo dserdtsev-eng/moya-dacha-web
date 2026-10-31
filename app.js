@@ -1,9 +1,11 @@
+// ⚠️ УКАЖИ ЗДЕСЬ СВОЙ РЕПОЗИТОРИЙ
 const GITHUB_USER = 'dserdtsev-eng';
 const GITHUB_REPO = 'moya-dacha-web';
 const JSON_FILE = 'snt_data.json';
 
 let appData = null;
 let currentPlot = null;
+let qrInstance = null; // Для хранения текущего QR
 
 // ─── УТИЛИТЫ ───
 async function pbkdf2(password, saltBase64) {
@@ -22,13 +24,14 @@ function formatMoney(amount) {
 
 function todayStr() {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function formatDateStr(dateStr) {
-    if (!dateStr) return '—';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}.${m}.${y}`;
+function formatDateRu(dateStr) {
+    if (!dateStr || dateStr === '—') return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    return dateStr;
 }
 
 // ─── ЗАГРУЗКА ДАННЫХ ───
@@ -40,9 +43,16 @@ async function loadData() {
         appData = await response.json();
         initLoginScreen();
         showScreen('login-screen');
+        
+        // Восстановление сессии
+        const savedPlotId = localStorage.getItem('snt_plot_id');
+        if (savedPlotId && document.getElementById('remember-me').checked) {
+            document.getElementById('street-select').value = appData.plots[savedPlotId].street;
+            document.getElementById('street-select').dispatchEvent(new Event('change'));
+            document.getElementById('house-select').value = savedPlotId;
+        }
     } catch (e) {
         alert('Ошибка загрузки данных: ' + e.message);
-        document.getElementById('loading').innerHTML = `<p class="error">Ошибка загрузки базы данных.</p>`;
     }
 }
 
@@ -52,34 +62,31 @@ function initLoginScreen() {
     const houseSelect = document.getElementById('house-select');
     const pwdInput = document.getElementById('password-input');
     const loginBtn = document.getElementById('login-btn');
-    const rememberCb = document.getElementById('remember-me');
 
     const streets = new Set();
-    Object.values(appData.plots).forEach(p => { if (p.street) streets.add(p.street); });
+    Object.values(appData.plots).forEach(p => { if(p.street) streets.add(p.street); });
 
-    streetSelect.innerHTML = '<option value=""></option>';
+    streetSelect.innerHTML = '<option value="">Выберите улицу</option>';
     Array.from(streets).sort().forEach(s => {
         streetSelect.innerHTML += `<option value="${s}">${s}</option>`;
     });
 
-    // 1. Сначала назначаем обработчики
     streetSelect.onchange = () => {
         const selectedStreet = streetSelect.value;
-        houseSelect.innerHTML = '<option value=""></option>';
-        if (!selectedStreet) { checkForm(); return; }
-
+        houseSelect.innerHTML = '<option value="">Выберите дом</option>';
+        if (!selectedStreet) return;
         Object.entries(appData.plots).forEach(([id, p]) => {
             if (p.street === selectedStreet) {
                 houseSelect.innerHTML += `<option value="${id}">${p.house}</option>`;
             }
         });
-        checkForm();
+        checkLoginReady();
     };
 
-    houseSelect.onchange = checkForm;
-    pwdInput.oninput = checkForm;
+    houseSelect.onchange = checkLoginReady;
+    pwdInput.oninput = checkLoginReady;
 
-    function checkForm() {
+    function checkLoginReady() {
         loginBtn.disabled = !(houseSelect.value && pwdInput.value.length === 4);
     }
 
@@ -90,7 +97,6 @@ function initLoginScreen() {
         
         errEl.textContent = 'Проверка...';
         const plot = appData.plots[plotId];
-
         try {
             if (!plot.passport_hash || !plot.passport_salt) {
                 errEl.textContent = 'Пароль для этого участка не задан';
@@ -98,14 +104,14 @@ function initLoginScreen() {
             }
             const hash = await pbkdf2(pwd, plot.passport_salt);
             if (hash === plot.passport_hash) {
-                if (rememberCb.checked) {
-                    localStorage.setItem('snt_street', plot.street);
-                    localStorage.setItem('snt_house', plotId);
-                } else {
-                    localStorage.removeItem('snt_street');
-                    localStorage.removeItem('snt_house');
-                }
                 currentPlot = { id: plotId, data: plot };
+                if (document.getElementById('remember-me').checked) {
+                    localStorage.setItem('snt_plot_id', plotId);
+                } else {
+                    localStorage.removeItem('snt_plot_id');
+                }
+                errEl.textContent = '';
+                pwdInput.value = '';
                 showScreen('dashboard-screen');
                 renderDashboard();
             } else {
@@ -115,22 +121,6 @@ function initLoginScreen() {
             errEl.textContent = 'Ошибка проверки пароля';
         }
     };
-
-    // 2. Только ТЕПЕРЬ восстанавливаем сохранённый выбор
-    const savedStreet = localStorage.getItem('snt_street');
-    const savedHouse = localStorage.getItem('snt_house');
-    if (savedStreet) {
-        streetSelect.value = savedStreet;
-        // Вызываем onchange вручную, чтобы наполнить список домов
-        if (typeof streetSelect.onchange === 'function') {
-            streetSelect.onchange();
-        }
-        
-        if (savedHouse) {
-            houseSelect.value = savedHouse;
-            checkForm();
-        }
-    }
 }
 
 // ─── ДАШБОРД ───
@@ -143,26 +133,26 @@ function renderDashboard() {
     const plot = currentPlot.data;
     document.getElementById('user-name').textContent = plot.owner || 'Участок';
     document.getElementById('user-address').textContent = `${plot.street} ${plot.house}`;
-    
+
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             renderTab(btn.dataset.tab);
-            document.getElementById('tab-content').scrollTop = 0;
         };
     });
+
     renderTab('debts');
 }
 
-// ─── ЛОГИКА ДОЛГОВ ───
+// ─── ЛОГИКА РАСЧЁТА ───
 function addYearMinusDay(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d)) return '';
     d.setFullYear(d.getFullYear() + 1);
     d.setDate(d.getDate() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return d.toISOString().slice(0, 10);
 }
 
 function paymentPeriod(payment) {
@@ -173,15 +163,8 @@ function paymentPeriod(payment) {
     if (!pd) return null;
     const curStart = s.fee_start_date || '';
     const prevStart = s.prev_fee_start_date || '';
-
-    if (curStart) {
-        const curEnd = addYearMinusDay(curStart);
-        if (pd >= curStart && pd <= curEnd) return 'current';
-    }
-    if (prevStart) {
-        const prevEnd = addYearMinusDay(prevStart);
-        if (pd >= prevStart && pd <= prevEnd) return 'prev';
-    }
+    if (curStart && pd >= curStart && pd <= addYearMinusDay(curStart)) return 'current';
+    if (prevStart && pd >= prevStart && pd <= addYearMinusDay(prevStart)) return 'prev';
     if (curStart && pd < curStart) return 'prev';
     if (!curStart) return 'current';
     return null;
@@ -201,19 +184,13 @@ function sumPaymentsInPeriod(plotId, predicate, period) {
     return total;
 }
 
-function getMemberPromo(plot, period) {
-    if (period === 'prev') return Number(plot.member_promo_prev || 0);
-    return Number(plot.member_promo || 0);
-}
-
 function getMemberDebt(plot, plotId) {
     const s = appData.settings;
     const fee = Number(s.member_fee || 0);
     if (!s.fee_start_date || fee <= 0) return 0;
     const paid = sumPaymentsInPeriod(plotId, isMemberPayment, 'current');
-    return Math.max(0, fee - getMemberPromo(plot, 'current') - paid);
+    return Math.max(0, fee - Number(plot.member_promo || 0) - paid);
 }
-
 function getTargetDebt(plot, plotId) {
     const s = appData.settings;
     const fee = Number(s.target_fee || 0);
@@ -221,15 +198,13 @@ function getTargetDebt(plot, plotId) {
     const paid = sumPaymentsInPeriod(plotId, isTargetPayment, 'current');
     return Math.max(0, fee - paid);
 }
-
 function getPrevMemberDebt(plot, plotId) {
     const s = appData.settings;
     const fee = Number(s.prev_member_fee || 0);
     if (fee <= 0 || !s.prev_fee_start_date) return 0;
     const paid = sumPaymentsInPeriod(plotId, isMemberPayment, 'prev');
-    return Math.max(0, fee - getMemberPromo(plot, 'prev') - paid);
+    return Math.max(0, fee - Number(plot.member_promo_prev || 0) - paid);
 }
-
 function getPrevTargetDebt(plot, plotId) {
     const s = appData.settings;
     const fee = Number(s.prev_target_fee || 0);
@@ -238,59 +213,389 @@ function getPrevTargetDebt(plot, plotId) {
     return Math.max(0, fee - paid);
 }
 
-// ─── ЭЛЕКТРИЧЕСТВО ───
+function getTotalDebt(plot, plotId) {
+    return getMemberDebt(plot, plotId) + getTargetDebt(plot, plotId) + getPrevMemberDebt(plot, plotId) + getPrevTargetDebt(plot, plotId);
+}
+
+// ─── ЛОГИКА ЭЛЕКТРИЧЕСТВА ───
 function getLastReplacementDate(plot) {
     let latest = '';
     for (const r of (plot.meter_readings || [])) {
-        if (r.replaced && r.date > latest) latest = r.date;
+        if (r.replaced && (r.date || '') > latest) latest = r.date;
     }
     return latest;
 }
 
-function getElectricSummary(plot, plotId) {
-    const tariffs = (appData.tariffs || []).slice().sort((a, b) => (a.date||'').localeCompare(b.date||''));
-    const since = getLastReplacementDate(plot);
+function getElectricSummary(plot) {
+    const readings = plot.meter_readings || [];
+    const lastRepl = getLastReplacementDate(plot);
     
+    // Берем показания после замены
+    const relevantReadings = readings.filter(r => !lastRepl || (r.date || '') >= lastRepl).sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    const lastReading = relevantReadings[relevantReadings.length - 1];
+    const lastVal = lastReading ? Number(lastReading.values["1"] || 0) : 0;
+
+    // Считаем расход по дельтам
+    let consumed = 0;
+    for (let i = 1; i < relevantReadings.length; i++) {
+        if (!relevantReadings[i].replaced) {
+            const v1 = Number(relevantReadings[i-1].values["1"] || 0);
+            const v2 = Number(relevantReadings[i].values["1"] || 0);
+            if (v2 > v1) consumed += (v2 - v1);
+        }
+    }
+
+    // Считаем оплачено кВт*ч
     let paidKwh = 0;
-    let paidRub = 0;
+    const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
     for (const p of (appData.payments || [])) {
-        if (String(p.plot) !== String(plotId)) continue;
-        if (!isElectricPayment(p.description)) continue;
-        if (since && p.date < since) continue;
+        if (String(p.plot) !== String(plot.id) || !isElectricPayment(p.description)) continue;
+        if (lastRepl && p.date < lastRepl) continue;
         
+        // Ищем тариф на дату платежа
         let tPrice = 0;
         for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
-        if (tPrice > 0) {
-            paidKwh += Number(p.amount) / tPrice;
-            paidRub += Number(p.amount);
+        if (tPrice > 0) paidKwh += (Number(p.amount) / tPrice);
+    }
+    
+    return { lastVal, consumed, paidKwh, balance: paidKwh - consumed };
+}
+// ─── РЕНДЕР ВКЛАДОК ───
+function renderTab(tab) {
+    const content = document.getElementById('tab-content');
+    const plotId = currentPlot.id;
+    const plot = currentPlot.data;
+    const settings = appData.settings;
+
+    // Сбрасываем текущий QR при смене вкладки
+    qrInstance = null;
+
+    if (tab === 'debts') {
+        const totalDebt = getTotalDebt(plot, plotId);
+
+        let html = '<h3>Задолженности</h3>';
+        if (totalDebt === 0) {
+            html += '<div class="card card-blue" style="text-align:center; font-size:18px; font-weight:bold; padding:30px 20px;">✓ Задолженностей по взносам нет</div>';
+        } else {
+            html += `<div class="card card-blue">
+                <div style="font-size: 18px; margin-bottom: 10px;">Общая сумма долга</div>
+                <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${formatMoney(totalDebt)}</div>
+            </div>`;
+            html += `<div class="card">
+                <div class="row"><span>За текущий период</span><span>${formatMoney(getMemberDebt(plot, plotId) + getTargetDebt(plot, plotId))}</span></div>
+                <div class="row"><span>За прошлый период</span><span>${formatMoney(getPrevMemberDebt(plot, plotId) + getPrevTargetDebt(plot, plotId))}</span></div>
+            </div>`;
         }
+        content.innerHTML = html;
+    }
+    
+    else if (tab === 'payments') {
+        const payments = (appData.payments || [])
+            .filter(p => String(p.plot) === String(plotId))
+            .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+        let html = '<h3>История платежей</h3>';
+        if (payments.length === 0) {
+            html += '<p>Платежей пока нет</p>';
+        } else {
+            payments.forEach(p => {
+                let periodText = p.period === 'prev' ? 'прошлый период' : (p.period === 'current' ? 'текущий период' : '');
+                html += `
+                    <div class="card">
+                        <div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(p.date)}</div>
+                        <div class="row" style="padding:0;">
+                            <span style="font-size: 18px;">${p.description || 'Платёж'}</span>
+                            <span style="font-size: 20px; color: var(--primary);">${formatMoney(Number(p.amount))}</span>
+                        </div>
+                        ${periodText ? `<div style="font-size: 14px; color: var(--text-light); margin-top: 5px;">${periodText}</div>` : ''}
+                    </div>
+                `;
+            });
+        }
+        content.innerHTML = html;
     }
 
-    let consumedKwh = 0;
-    const meters = plot.meters || [{id:1}];
-    for (const m of meters) {
-        const mid = String(m.id);
-        const rwm = (plot.meter_readings || []).filter(r => r.values && r.values[mid] !== undefined).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-        
-        let startIdx = 0;
-        for (let i=0; i<rwm.length; i++) { if (rwm[i].replaced) startIdx = i; }
-        
-        let prev = null;
-        for (let i=startIdx; i<rwm.length; i++) {
-            const v = Number(rwm[i].values[mid]);
-            if (prev !== null && !rwm[i].replaced && v > prev) {
-                consumedKwh += (v - prev);
-            }
-            prev = v;
+    else if (tab === 'readings') {
+        const readings = (plot.meter_readings || [])
+            .slice()
+            .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+        let html = '<h3>Показания счётчиков</h3>';
+        if (readings.length === 0) {
+            html += '<p>Показаний пока нет</p>';
+        } else {
+            readings.forEach(r => {
+                const val = r.values && r.values["1"] !== undefined ? r.values["1"] : '—';
+                html += `
+                    <div class="card">
+                        <div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(r.date)}</div>
+                        <div class="row" style="padding:0;">
+                            <span style="font-size: 18px;">Счётчик</span>
+                            <span style="font-size: 20px; font-weight: bold;">${val}</span>
+                        </div>
+                    </div>
+                `;
+            });
         }
+        content.innerHTML = html;
     }
-    return { paidKwh, consumedKwh, paidRub, balance: paidKwh - consumedKwh, lastReplacement: since };
+
+    else if (tab === 'electric') {
+        const summary = getElectricSummary({ ...plot, id: plotId });
+        const lastRepl = getLastReplacementDate(plot);
+
+        let html = '<h3>Электричество</h3>';
+        html += `<div style="color: var(--text-light); margin-bottom: 15px;">Период: с ${lastRepl ? formatDateRu(lastRepl) : 'начала'} (после замены счётчика)</div>`;
+
+        // Баланс
+        html += `<div class="card">
+            <h4 style="font-size: 18px; margin-bottom: 15px;">Баланс</h4>
+            <div class="row"><span>Оплачено, кВт·ч</span><span>${summary.paidKwh.toFixed(1)}</span></div>
+            <div class="row"><span>Израсходовано, кВт·ч</span><span>${summary.consumed.toFixed(1)}</span></div>
+            <div class="row total" style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
+                <span>Итог</span><span style="color: ${summary.balance < 0 ? 'var(--error)' : 'var(--success)'}">${summary.balance.toFixed(1)}</span>
+            </div>
+        </div>`;
+
+        // История оплаченных кВт*ч
+        html += `<h4 style="font-size: 18px; margin-top: 25px; margin-bottom: 15px;">Оплаченные кВт·ч</h4>`;
+        const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
+        const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a,b) => b.date.localeCompare(a.date));
+        
+        if (ePayments.length === 0) {
+            html += '<p>Платежей за электричество нет</p>';
+        } else {
+            ePayments.forEach(p => {
+                let tPrice = 0;
+                for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
+                const kwh = tPrice > 0 ? (p.amount / tPrice).toFixed(0) : '—';
+                html += `<div class="card">
+                    <div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(p.date)}</div>
+                    <div class="row" style="padding:0;">
+                        <div style="font-size: 14px; color: var(--text-light);">${formatMoney(p.amount)} ÷ ${tPrice.toFixed(2)} ₽/кВт·ч</div>
+                        <span style="font-size: 20px; font-weight: bold;">${kwh}</span>
+                    </div>
+                </div>`;
+            });
+        }
+        content.innerHTML = html;
+    }
+
+    else if (tab === 'qr') {
+        renderQRTab(plot, plotId, content);
+    }
+
+    else if (tab === 'deadlines') {
+        const feeStart = settings.fee_start_date || '—';
+        const feeEnd = feeStart !== '—' ? addYearMinusDay(feeStart) : '—';
+        
+        let html = '<h3>Сроки оплаты</h3>';
+        
+        if (Number(settings.member_fee) > 0) {
+            html += `<div class="card">
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой членский взнос</div>
+                <div class="row" style="padding: 5px 0;"><span>Сумма:</span><span>${formatMoney(settings.member_fee)}</span></div>
+                <div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.member_deadline) || 'не указан'}</span></div>
+            </div>`;
+        }
+        
+        if (Number(settings.target_fee) > 0) {
+            html += `<div class="card">
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой целевой взнос</div>
+                <div class="row" style="padding: 5px 0;"><span>Сумма:</span><span>${formatMoney(settings.target_fee)}</span></div>
+                <div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.target_deadline) || 'не указан'}</span></div>
+            </div>`;
+        }
+
+        html += `<div class="card">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Электроэнергия</div>
+            <div class="row" style="padding: 5px 0;"><span>Срок:</span><span>до ${settings.electric_day} числа каждого месяца</span></div>
+        </div>`;
+
+        html += `<div class="card">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Период взносов</div>
+            <div class="row" style="padding: 5px 0;"><span>С:</span><span>${formatDateRu(feeStart)}</span></div>
+            <div class="row" style="padding: 5px 0;"><span>По:</span><span>${formatDateRu(feeEnd)}</span></div>
+        </div>`;
+
+        content.innerHTML = html;
+    }
 }
 
-// ─── QR-КОД ───
-function buildPaymentQR(amount, purpose) {
+// ─── ВКЛАДКА «QR» ───
+function renderQRTab(plot, plotId, content) {
+    let totalDebt = getTotalDebt(plot, plotId);
+    const summary = getElectricSummary({ ...plot, id: plotId });
+
+    let html = `
+        <div class="card">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">Участок: ${plot.street} ${plot.house}</div>
+            <div style="font-size: 18px; color: var(--text-light);">Владелец: ${plot.owner || '—'}</div>
+        </div>
+        
+        <h3 style="margin-top: 10px;">За что платим?</h3>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button id="qr-btn-vznos" class="btn-pill" style="flex: 1; background: var(--primary); color: white;">Взносы</button>
+            <button id="qr-btn-electro" class="btn-pill" style="flex: 1; background: white; color: var(--text); border: 1px solid var(--border);">Электро</button>
+        </div>
+
+        <div id="qr-content-area"></div>
+    `;
+    content.innerHTML = html;
+
+    const btnVznos = document.getElementById('qr-btn-vznos');
+    const btnElectro = document.getElementById('qr-btn-electro');
+    const area = document.getElementById('qr-content-area');
+
+    // Функция переключения вкладок внутри QR
+    function setActiveTab(isVznos) {
+        qrInstance = null;
+        if (isVznos) {
+            btnVznos.style.background = 'var(--primary)';
+            btnVznos.style.color = 'white';
+            btnVznos.style.border = 'none';
+            btnElectro.style.background = 'white';
+            btnElectro.style.color = 'var(--text)';
+            btnElectro.style.border = '1px solid var(--border)';
+            renderQRVznos(area, plot, totalDebt);
+        } else {
+            btnElectro.style.background = 'var(--primary)';
+            btnElectro.style.color = 'white';
+            btnElectro.style.border = 'none';
+            btnVznos.style.background = 'white';
+            btnVznos.style.color = 'var(--text)';
+            btnVznos.style.border = '1px solid var(--border)';
+            renderQRElectro(area, plot, summary);
+        }
+    }
+
+    btnVznos.onclick = () => setActiveTab(true);
+    btnElectro.onclick = () => setActiveTab(false);
+
+    // По умолчанию открываем взносы
+    setActiveTab(true);
+}
+
+// ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
+function renderQRVznos(area, plot, totalDebt) {
+    if (totalDebt <= 0) {
+        area.innerHTML = `
+            <div class="card card-blue" style="text-align: center; font-size: 20px; padding: 30px 20px;">
+                Сумма к оплате<br><br>
+                <span style="font-size: 32px; font-weight: bold;">0,00 ₽</span>
+            </div>
+            <div class="card" style="text-align: center; font-size: 18px; color: var(--text-light); padding: 30px 20px;">
+                Нет задолженности по взносам
+            </div>
+        `;
+        return;
+    }
+
+    area.innerHTML = `
+        <div class="card card-blue" style="text-align: center; padding: 20px;">
+            <div style="font-size: 18px;">Сумма к оплате</div>
+            <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">${formatMoney(totalDebt)}</div>
+        </div>
+        <div style="text-align: center; margin-top: 20px;" id="qr-wrapper">
+            <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
+            <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
+            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white;">💾 Сохранить QR в галерею</button>
+        </div>
+    `;
+
+    const purpose = `${plot.street} ${plot.house}, взносы`;
+    const qrData = buildPaymentQR(plot, totalDebt, purpose);
+    
+    setTimeout(() => {
+        const qrTarget = document.getElementById('qr-target');
+        if (qrTarget) {
+            qrInstance = new QRCode(qrTarget, {
+                text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+    }, 50);
+
+    document.getElementById('save-qr-btn').onclick = () => saveQRToGallery();
+}
+
+// ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
+function renderQRElectro(area, plot, summary) {
+    const today = todayStr();
+    let currentTariff = 0;
+    for (const t of (appData.tariffs || [])) { if (t.date <= today) currentTariff = t.price; }
+    
+    area.innerHTML = `
+        <div class="card">
+            <div style="font-size: 18px; margin-bottom: 15px;">Текущее показание счётчика:</div>
+            <input type="number" id="qr-electro-input" class="input-large" placeholder="Показание" value="${summary.lastVal || ''}">
+            <div class="row" style="margin-top: 15px;"><span>Предыдущее: ${summary.lastVal}</span></div>
+            <div class="row"><span>Расход: <span id="qr-delta">0</span> кВт·ч</span></div>
+            <div class="row"><span>Тариф: ${Number(currentTariff).toFixed(2)} ₽/кВт·ч</span></div>
+        </div>
+        
+        <div class="card card-blue" style="text-align: center; padding: 20px;">
+            <div style="font-size: 18px;">Сумма к оплате</div>
+            <div id="qr-electro-sum" style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">0,00 ₽</div>
+            <div id="qr-electro-err" style="color: var(--error); font-size: 16px; margin-top: 10px; display: none;">Введите показание больше предыдущего</div>
+        </div>
+        
+        <div id="qr-electro-block" style="text-align: center; margin-top: 20px; display: none;">
+            <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
+            <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
+            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white;">💾 Сохранить QR в галерею</button>
+        </div>
+    `;
+
+    const input = document.getElementById('qr-electro-input');
+    const deltaSpan = document.getElementById('qr-delta');
+    const sumDiv = document.getElementById('qr-electro-sum');
+    const errDiv = document.getElementById('qr-electro-err');
+    const qrBlock = document.getElementById('qr-electro-block');
+
+    input.oninput = () => {
+        const val = parseFloat(input.value);
+        const prev = summary.lastVal;
+        
+        if (isNaN(val) || val <= prev) {
+            deltaSpan.textContent = '0';
+            sumDiv.textContent = '0,00 ₽';
+            errDiv.style.display = val > 0 ? 'block' : 'none';
+            qrBlock.style.display = 'none';
+            qrInstance = null;
+            return;
+        }
+
+        errDiv.style.display = 'none';
+        const delta = val - prev;
+        const sum = delta * currentTariff;
+        
+        deltaSpan.textContent = delta.toFixed(1);
+        sumDiv.textContent = formatMoney(sum);
+        qrBlock.style.display = 'block';
+
+        const purpose = `${plot.street} ${plot.house}, электроэнергия`;
+        const qrData = buildPaymentQR(plot, sum, purpose);
+
+        setTimeout(() => {
+            const qrTarget = document.getElementById('qr-target');
+            if (qrTarget) {
+                qrTarget.innerHTML = '';
+                qrInstance = new QRCode(qrTarget, {
+                    text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
+                });
+            }
+        }, 50);
+    };
+
+    document.getElementById('save-qr-btn').onclick = () => saveQRToGallery();
+}
+
+// ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
+function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
-    if (!req.personal_acc || !req.bic) return null;
     return [
         'ST00012',
         'Name=' + (req.name || 'СНТ НАДЕЖДА'),
@@ -305,290 +610,35 @@ function buildPaymentQR(amount, purpose) {
     ].join('|');
 }
 
-function renderQR(containerId, qrString) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = '';
+function saveQRToGallery() {
+    if (!qrInstance) return;
+    // В qrcodejs картинка рендерится в <canvas> или <img>. Ищем её.
+    const qrTarget = document.getElementById('qr-target');
+    const img = qrTarget.querySelector('img');
+    const canvas = qrTarget.querySelector('canvas');
     
-    if (!qrString) {
-        container.innerHTML = '<p class="error" style="text-align:center;">Реквизиты СНТ не заполнены в базе.</p>';
+    let dataUrl = '';
+    if (img && img.src) {
+        dataUrl = img.src;
+    } else if (canvas) {
+        dataUrl = canvas.toDataURL("image/png");
+    }
+
+    if (!dataUrl) {
+        alert('Не удалось сохранить QR');
         return;
     }
-    if (typeof QRCode === 'undefined') {
-        container.innerHTML = '<p class="error" style="text-align:center;">Библиотека QR не загрузилась. Проверьте интернет.</p>';
-        return;
-    }
-    
-    try {
-        new QRCode(container, { 
-            text: qrString, 
-            width: 200, 
-            height: 200, 
-            correctLevel: QRCode.CorrectLevel.M 
-        });
-    } catch (e) {
-        container.innerHTML = `<p class="error" style="text-align:center;">Ошибка генерации: ${e.message}</p>`;
-    }
+
+    // Создаем ссылку для скачивания
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `QR_СНТ_${currentPlot.data.street}_${currentPlot.data.house}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
-// ─── РЕНДЕР ВКЛАДОК ───
-function renderTab(tab) {
-    const content = document.getElementById('tab-content');
-    const plotId = currentPlot.id;
-    const plot = currentPlot.data;
-
-    if (tab === 'debts') {
-        const memberDebt = getMemberDebt(plot, plotId);
-        const targetDebt = getTargetDebt(plot, plotId);
-        const prevMemberDebt = getPrevMemberDebt(plot, plotId);
-        const prevTargetDebt = getPrevTargetDebt(plot, plotId);
-        
-        const totalCurrent = memberDebt + targetDebt;
-        const totalPrev = prevMemberDebt + prevTargetDebt;
-        const totalAll = totalCurrent + totalPrev;
-
-        let html = '<h3>Задолженности</h3>';
-
-        if (totalAll === 0) {
-            html += '<div class="card card-blue"><span style="font-size:24px; margin-right:10px;">✓</span> Задолженностей по взносам нет</div>';
-        } else {
-            html += '<div class="card">';
-            if (totalPrev > 0) {
-                html += `<div class="row"><span>Прошлый период</span><span>${formatMoney(totalPrev)}</span></div>`;
-            }
-            if (totalCurrent > 0) {
-                html += `<div class="row"><span>Текущий период</span><span>${formatMoney(totalCurrent)}</span></div>`;
-            }
-            html += `<div class="row total" style="border-top: 1px solid #ccc; padding-top:10px;"><span>Итого</span><span>${formatMoney(totalAll)}</span></div>`;
-            html += '</div>';
-        }
-        content.innerHTML = html;
-    }
-    else if (tab === 'payments') {
-        const payments = (appData.payments || [])
-            .filter(p => String(p.plot) === String(plotId))
-            .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        
-        let html = '<h3>История платежей</h3>';
-        if (payments.length === 0) {
-            html += '<p>Платежей пока нет</p>';
-        } else {
-            payments.forEach(p => {
-                let per = '';
-                const period = paymentPeriod(p);
-                if (period === 'prev') per = 'прошлый период';
-                if (period === 'current') per = 'текущий период';
-                
-                html += `
-                    <div class="card" style="padding: 15px;">
-                        <div style="font-size: 18px; margin-bottom: 5px;">${formatDateStr(p.date)}</div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="color:var(--text-light);">${p.description || ''}<br><small>${per}</small></div>
-                            <span style="font-size: 20px; font-weight: bold; color: var(--primary);">${formatMoney(Number(p.amount)||0)}</span>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        content.innerHTML = html;
-    }
-    else if (tab === 'readings') {
-        const readings = (plot.meter_readings || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        const meters = plot.meters || [{ id: 1, name: 'Счётчик' }];
-        
-        let html = '<h3>Показания счётчиков</h3>';
-        if (readings.length === 0) {
-            html += '<p>Показаний пока нет</p>';
-        } else {
-            readings.forEach(r => {
-                const vals = meters.map(m => r.values && r.values[m.id] !== undefined ? `${m.name}: ${r.values[m.id]}` : '').filter(Boolean).join(' / ');
-                html += `
-                    <div class="card" style="padding: 15px;">
-                        <div style="font-size: 18px; margin-bottom: 5px;">${formatDateStr(r.date)}</div>
-                        <div style="display:flex; justify-content:space-between;">
-                            <span style="color:var(--text-light);">${vals}</span>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        content.innerHTML = html;
-    }
-    else if (tab === 'deadlines') {
-        const s = appData.settings;
-        content.innerHTML = `
-            <h3>Сроки оплаты</h3>
-            <div class="card">
-                <div class="card-title">Годовой членский взнос</div>
-                <div class="row"><span>Сумма:</span><span>${formatMoney(s.member_fee || 0)}</span></div>
-                <div class="row"><span>Срок:</span><span>${formatDateStr(s.member_deadline)}</span></div>
-            </div>
-            <div class="card">
-                <div class="card-title">Годовой целевой взнос</div>
-                <div class="row"><span>Сумма:</span><span>${formatMoney(s.target_fee || 0)}</span></div>
-                <div class="row"><span>Срок:</span><span>${formatDateStr(s.target_deadline)}</span></div>
-            </div>
-            <div class="card">
-                <div class="card-title">Электроэнергия</div>
-                <div class="row"><span>Срок:</span><span>до ${s.electric_day || 20} числа</span></div>
-            </div>
-            <h3 style="margin-top:20px;">Период взносов</h3>
-            <div class="card">
-                <div class="row"><span>Начало:</span><span>${formatDateStr(s.fee_start_date)}</span></div>
-                <div class="row"><span>Конец:</span><span>${formatDateStr(addYearMinusDay(s.fee_start_date))}</span></div>
-            </div>
-        `;
-    }
-    else if (tab === 'electric') {
-        const summary = getElectricSummary(plot, plotId);
-        let html = '<h3>Электричество</h3>';
-        
-        if (summary.lastReplacement) {
-            html += `<p style="margin-bottom:15px; font-size:16px;">Период: с ${formatDateStr(summary.lastReplacement)} (после замены счётчика)</p>`;
-        }
-
-        html += '<div class="card">';
-        html += '<div class="card-title">Баланс</div>';
-        html += `<div class="row"><span>Оплачено, кВт·ч</span><span>${summary.paidKwh.toFixed(2)}</span></div>`;
-        html += `<div class="row"><span>Израсходовано, кВт·ч</span><span>${summary.consumedKwh.toFixed(2)}</span></div>`;
-        html += `<div class="row total" style="border-top: 1px solid #ccc; padding-top:10px;"><span>Итог</span><span>${summary.balance.toFixed(2)}</span></div>`;
-        html += '</div>';
-
-        const electricPayments = (appData.payments || [])
-            .filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description))
-            .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-            
-        if (electricPayments.length > 0) {
-            html += '<h3 style="margin-top:20px;">Оплаченные кВт·ч</h3>';
-            const tariffs = (appData.tariffs || []).slice().sort((a, b) => (a.date||'').localeCompare(b.date||''));
-            
-            electricPayments.forEach(p => {
-                let tPrice = 0;
-                for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
-                const kwh = tPrice > 0 ? (Number(p.amount) / tPrice) : 0;
-                
-                html += `
-                    <div class="card" style="padding: 15px; margin-bottom: 10px;">
-                        <div style="font-size: 18px; margin-bottom: 5px;">${formatDateStr(p.date)}</div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="color:var(--text-light); font-size: 14px;">
-                                ${formatMoney(Number(p.amount)||0)} ÷ ${tPrice.toFixed(2)} ₽/кВт·ч
-                            </div>
-                            <span style="font-size: 20px; font-weight: bold;">${kwh.toFixed(0)}</span>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        content.innerHTML = html;
-    }
-    else if (tab === 'qr') {
-        const s = appData.settings;
-        const memberDebt = getMemberDebt(plot, plotId);
-        const targetDebt = getTargetDebt(plot, plotId);
-        const prevMemberDebt = getPrevMemberDebt(plot, plotId);
-        const prevTargetDebt = getPrevTargetDebt(plot, plotId);
-        const totalVznosy = memberDebt + targetDebt + prevMemberDebt + prevTargetDebt;
-
-        let html = '<h3>Оплата по QR-коду</h3>';
-
-        // Взносы
-        html += '<div class="card">';
-        html += '<div class="card-title">Взносы</div>';
-        if (totalVznosy > 0) {
-            html += `<div class="row"><span>Сумма к оплате</span><span>${formatMoney(totalVznosy)}</span></div>`;
-            html += `<div id="qr-vznosy" style="text-align:center; margin-top:15px;"></div>`;
-            html += `<p style="text-align:center; font-size:12px; color:#777; margin-top:10px;">Отсканируйте в приложении банка</p>`;
-        } else {
-            html += `<div class="row" style="color:var(--success); font-weight:bold; justify-content:center;">Задолженностей нет</div>`;
-        }
-        html += '</div>';
-
-        // Электричество
-        html += '<div class="card" style="margin-top: 20px;">';
-        html += '<div class="card-title">Электричество</div>';
-        
-        const tariffs = (appData.tariffs || []).slice().sort((a, b) => (a.date||'').localeCompare(b.date||''));
-        let currentTariff = null;
-        const today = todayStr();
-        for (const t of tariffs) { if (t.date <= today) currentTariff = t; }
-        const tariffPrice = currentTariff ? Number(currentTariff.price) : 0;
-
-        if (tariffPrice <= 0) {
-            html += '<p class="error">Тариф не задан. Обратитесь к председателю.</p>';
-        } else {
-            html += `<div class="row" style="color:var(--text-light); margin-bottom:10px;"><span>Тариф</span><span>${tariffPrice.toFixed(2)} ₽/кВт·ч</span></div>`;
-            
-            const meters = plot.meters || [{ id: 1, name: 'Счётчик' }];
-            const readings = plot.meter_readings || [];
-            
-            meters.forEach(m => {
-                const mid = String(m.id);
-                const mReadings = readings.filter(r => r.values && r.values[mid] !== undefined).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-                let startIdx = 0;
-                for (let i=0; i<mReadings.length; i++) { if (mReadings[i].replaced) startIdx = i; }
-                const relevant = mReadings.slice(startIdx);
-                const last = relevant[relevant.length - 1];
-                const prevVal = last ? Number(last.values[mid]) : 0;
-
-                html += `<div style="margin-top: 15px; padding-top:15px; border-top: 1px dashed #ccc;">`;
-                html += `<div class="row"><span>Предыдущее (${m.name})</span><span>${prevVal}</span></div>`;
-                html += `<input type="number" class="input-large" id="qr-new-reading-${mid}" placeholder="Новое показание">`;
-                html += `<button class="btn-calc" onclick="calcElectricQR('${mid}', ${prevVal}, ${tariffPrice})">Рассчитать</button>`;
-                html += `<div id="qr-elec-result-${mid}" style="margin-top:10px;"></div>`;
-                html += `<div id="qr-elec-code-${mid}" style="text-align:center; margin-top:15px;"></div>`;
-                html += `</div>`;
-            });
-        }
-        html += '</div>';
-
-        content.innerHTML = html;
-
-        if (totalVznosy > 0) {
-            const purpose = `${plot.street} ${plot.house}, взносы`;
-            renderQR('qr-vznosy', buildPaymentQR(totalVznosy, purpose));
-        }
-    }
-}
-
-// Функция для расчета и рендера QR на вкладке "QR"
-window.calcElectricQR = function(mid, prevVal, tariffPrice) {
-    const input = document.getElementById(`qr-new-reading-${mid}`);
-    const val = parseFloat(input.value);
-    const resultDiv = document.getElementById(`qr-elec-result-${mid}`);
-    const qrDiv = document.getElementById(`qr-elec-code-${mid}`);
-    
-    if (isNaN(val) || val < 0) {
-        resultDiv.innerHTML = '<p class="error">Введите корректное показание</p>';
-        qrDiv.innerHTML = '';
-        return;
-    }
-    if (val < prevVal) {
-        resultDiv.innerHTML = `<p class="error">Введите показание больше предыдущего (${prevVal})</p>`;
-        qrDiv.innerHTML = '';
-        return;
-    }
-    
-    const delta = val - prevVal;
-    const amount = delta * tariffPrice;
-    
-    resultDiv.innerHTML = `
-        <div class="row"><span>Расход</span><span>${delta.toFixed(2)} кВт·ч</span></div>
-        <div class="row total" style="color:var(--primary);"><span>Сумма к оплате</span><span>${formatMoney(amount)}</span></div>
-    `;
-    
-    if (amount > 0) {
-        const plot = currentPlot.data;
-        const meterObj = (plot.meters || []).find(x => String(x.id) === String(mid));
-        const mName = meterObj ? meterObj.name : 'электричество';
-        const purpose = `${plot.street} ${plot.house}, электроэнергия (${mName})`;
-        renderQR(`qr-elec-code-${mid}`, buildPaymentQR(amount, purpose));
-    } else {
-        qrDiv.innerHTML = '';
-    }
-};
-
-// ─── ДЕЙСТВИЯ В ШАПКЕ ───
+// ─── ОБРАБОТЧИКИ ШАПКИ ───
 document.getElementById('logout-btn').onclick = () => {
     currentPlot = null;
     document.getElementById('password-input').value = '';
@@ -597,26 +647,11 @@ document.getElementById('logout-btn').onclick = () => {
 };
 
 document.getElementById('refresh-btn').onclick = () => {
-    loadData();
+    location.reload();
 };
 
 document.getElementById('info-btn').onclick = () => {
-    if (!currentPlot) return;
-    const s = appData.settings;
-    let info = `Владелец: ${currentPlot.data.owner}\n`;
-    info += `Телефон: ${currentPlot.data.phone || '—'}\n`;
-    info += `Проживание: ${currentPlot.data.residence || '—'}\n\n`;
-    info += `Реквизиты СНТ:\n`;
-    if (s.requisites) {
-        info += `Получатель: ${s.requisites.name}\n`;
-        info += `Счёт: ${s.requisites.personal_acc}\n`;
-        info += `Банк: ${s.requisites.bank_name}\n`;
-        info += `БИК: ${s.requisites.bic}\n`;
-        info += `Корр. счёт: ${s.requisites.corresp_acc}\n`;
-        info += `ИНН: ${s.requisites.inn}\n`;
-        info += `КПП: ${s.requisites.kpp}\n`;
-    }
-    alert(info);
+    alert(`СНТ «Надежда»\n\nСайт: https://${GITHUB_USER}.github.io/${GITHUB_REPO}/\n\nЕсли что-то не работает — обратитесь к председателю.`);
 };
 
 // ─── СТАРТ ───
