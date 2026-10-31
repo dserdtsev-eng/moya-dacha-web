@@ -504,7 +504,7 @@ function renderQRVznos(area, plot, totalDebt) {
         </div>
         <div style="text-align: center; margin-top: 20px;" id="qr-wrapper">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
-            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
             <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
@@ -513,15 +513,22 @@ function renderQRVznos(area, plot, totalDebt) {
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
     
+    // Даем DOM обновиться, затем генерируем QR
     setTimeout(() => {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
+            qrTarget.innerHTML = ''; // Очистка
             new QRCode(qrTarget, {
-                text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
+                text: qrData,
+                width: 240,
+                height: 240,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
             });
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
-    }, 100);
+    }, 200); // Увеличили задержку до 200 мс
 }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
@@ -547,7 +554,7 @@ function renderQRElectro(area, plot, summary) {
         
         <div id="qr-electro-block" style="text-align: center; margin-top: 20px; display: none;">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
-            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
             <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
@@ -585,13 +592,18 @@ function renderQRElectro(area, plot, summary) {
         setTimeout(() => {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
-                qrTarget.innerHTML = '';
+                qrTarget.innerHTML = ''; // Очистка перед новой отрисовкой
                 new QRCode(qrTarget, {
-                    text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
+                    text: qrData,
+                    width: 240,
+                    height: 240,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.M
                 });
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
-        }, 100);
+        }, 200); // Увеличили задержку
     };
 }
 
@@ -616,25 +628,35 @@ function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
+    // Ищем canvas (основной вариант отрисовки)
     const canvas = container.querySelector('canvas');
+    // На всякий случай ищем img (запасной вариант)
     const img = container.querySelector('img');
 
     let dataUrl = '';
-    // Если библиотека отрисовала canvas (в современных браузерах) - берем его
     if (canvas) {
         dataUrl = canvas.toDataURL("image/png");
-    } 
-    // Если отрисовала img (в некоторых браузерах)
-    else if (img && img.src) {
+    } else if (img && img.src && img.src.startsWith('data:image')) {
         dataUrl = img.src;
+    } else if (img && img.src) {
+        // Если img.src это blob или что-то еще, попробуем нарисовать на холсте
+        try {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth || img.width || 240;
+            c.height = img.naturalHeight || img.height || 240;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            dataUrl = c.toDataURL("image/png");
+        } catch(e) {
+            console.error('Ошибка конвертации', e);
+        }
     }
 
     if (!dataUrl || dataUrl === 'data:,') {
-        alert('QR-код ещё не сгенерирован. Подождите секунду и попробуйте снова.');
+        alert('QR-код ещё не готов. Подождите пару секунд и попробуйте снова.');
         return;
     }
 
-    // Создаем виртуальную ссылку для скачивания
     const a = document.createElement('a');
     a.href = dataUrl;
     const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
