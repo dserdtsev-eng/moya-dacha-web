@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>СНТ Надежда</title>
+    <title>Моя дача - СНТ Надежда</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,33 +16,45 @@
 
         <!-- Экран входа -->
         <div id="login-screen" class="screen">
-            <h1>СНТ «Надежда»</h1>
-            <p class="subtitle">Личный кабинет садовода</p>
+            <h1 class="main-title">Моя дача</h1>
+            <p class="subtitle">СНТ «Надежда»</p>
             
-            <div class="form-group">
+            <div class="form-group outlined">
                 <label>Улица</label>
                 <select id="street-select"></select>
             </div>
             
-            <div class="form-group">
+            <div class="form-group outlined">
                 <label>Дом</label>
                 <select id="house-select"></select>
             </div>
             
-            <div class="form-group">
-                <label>Пароль (4 цифры)</label>
-                <input type="password" id="password-input" inputmode="numeric" maxlength="4" placeholder="••••">
+            <div class="form-group outlined">
+                <input type="password" id="password-input" inputmode="numeric" maxlength="4" placeholder="Пароль (4 цифры)">
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="remember-me" checked>
+                <label for="remember-me">Запомнить мой выбор</label>
             </div>
             
-            <button id="login-btn">Войти</button>
+            <button id="login-btn" class="btn-pill" disabled>Войти</button>
             <p id="login-error" class="error"></p>
+            <p class="hint" style="margin-top: 30px; font-size: 14px;">Пароль выдаёт председатель СНТ</p>
         </div>
 
         <!-- Экран дашборда -->
         <div id="dashboard-screen" class="screen">
-            <header>
-                <h2 id="user-title">Участок</h2>
-                <button id="logout-btn">Выйти</button>
+            <header class="app-header">
+                <div class="header-info">
+                    <h2 id="user-name">Владелец</h2>
+                    <p id="user-address">Адрес</p>
+                </div>
+                <div class="header-actions">
+                    <button id="refresh-btn" class="btn-icon" title="Обновить">🔄</button>
+                    <button id="info-btn" class="btn-icon" title="Информация">ℹ️</button>
+                    <button id="logout-btn" class="btn-text">Выйти</button>
+                </div>
             </header>
             
             <nav class="tabs">
@@ -50,14 +62,16 @@
                 <button class="tab-btn" data-tab="payments">Платежи</button>
                 <button class="tab-btn" data-tab="readings">Показания</button>
                 <button class="tab-btn" data-tab="electric">Электро</button>
+                <button class="tab-btn" data-tab="qr">QR</button>
                 <button class="tab-btn" data-tab="deadlines">Сроки</button>
             </nav>
 
-            <div id="tab-content">
-                <!-- Содержимое вкладок будет вставляться через JS -->
+            <div id="tab-content" class="tab-content">
+                <!-- Содержимое вставляется JS -->
             </div>
         </div>
     </div>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="app.js"></script>
 </body>
