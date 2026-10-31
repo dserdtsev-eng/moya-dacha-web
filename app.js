@@ -610,6 +610,7 @@ function renderQRElectro(area, plot, summary) {
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
+    console.log("QR СТРОКА:", ['ST00012', 'Name=' + (req.name || 'СНТ НАДЕЖДА'), 'PersonalAcc=' + (req.personal_acc || ''), 'BankName=' + (req.bank_name || ''), 'BIC=' + (req.bic || ''), 'CorrespAcc=' + (req.corresp_acc || ''), 'PayeeINN=' + (req.inn || ''), 'KPP=' + (req.kpp || ''), 'Sum=' + Math.round(amount * 100), 'Purpose=' + purpose].join('|'));
     return [
         'ST00012',
         'Name=' + (req.name || 'СНТ НАДЕЖДА'),
