@@ -1,12 +1,12 @@
 :root {
-    --primary: #007ba3;
-    --bg: #f5f7fa; /* Чуть светло-серый фон для контраста с белыми карточками */
+    --primary: #007ba3; /* Цвет как на скриншотах */
+    --bg: #ffffff;
     --text: #333;
     --text-light: #666;
     --error: #d32f2f;
     --success: #007ba3;
-    --card-bg: #e0e5ec;
-    --card-blue: #c1e2f0;
+    --card-bg: #e0e5ec; /* Серо-голубой фон карточек */
+    --card-blue: #c1e2f0; /* Голубой фон для акцентов */
     --border: #ccc;
 }
 
@@ -19,27 +19,10 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
-/* ─── ОБЩИЕ НАСТРОЙКИ ЭКРАНОВ ─── */
-.screen { 
-    display: none; 
-    width: 100%; 
-    max-width: 600px; 
-    margin: 0 auto; 
-    height: 100vh; 
-    overflow: hidden; /* Запрещаем прокрутку всего экрана */
-}
-.screen.active { 
-    display: flex; 
-    flex-direction: column; 
-}
+.screen { display: none; padding: 20px; max-width: 600px; margin: 0 auto; height: 100vh; overflow-y: auto; }
+.screen.active { display: flex; flex-direction: column; }
 
-/* Экран загрузки и входа могут прокручиваться целиком */
-#loading, #login-screen { 
-    padding: 20px; 
-    overflow-y: auto; 
-}
-
-/* ─── ЭКРАН ЗАГРУЗКИ ─── */
+/* Экран загрузки */
 #loading { align-items: center; justify-content: center; }
 .spinner {
     width: 40px; height: 40px;
@@ -48,7 +31,7 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ─── ЭКРАН ВХОДА ─── */
+/* Экран входа */
 #login-screen { padding-top: 50px; }
 .main-title {
     text-align: center; color: var(--primary); font-size: 32px; font-weight: bold; margin-bottom: 5px;
@@ -88,21 +71,9 @@ body {
 .error { color: var(--error); text-align: center; margin-top: 10px; font-size: 14px; }
 .hint { text-align: center; color: var(--text-light); }
 
-
-/* ─── ШАПКА ДАШБОРДА (ФИКСИРОВАННАЯ) ─── */
-#dashboard-screen {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    padding: 15px 20px 0 20px; /* Отступ сверху и по бокам, снизу 0 */
-}
-
+/* Шапка дашборда */
 .app-header {
-    display: flex; 
-    justify-content: space-between; 
-    align-items: flex-start; 
-    margin-bottom: 15px;
-    flex-shrink: 0; /* Запрещаем шапке сжиматься */
+    display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;
 }
 .header-info h2 { font-size: 20px; font-weight: bold; }
 .header-info p { font-size: 16px; color: var(--text-light); }
@@ -110,16 +81,10 @@ body {
 .btn-icon { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--primary); }
 .btn-text { background: none; border: none; font-size: 16px; color: var(--error); cursor: pointer; font-weight: bold; }
 
-/* ─── ВКЛАДКИ (ФИКСИРОВАННЫЕ) ─── */
+/* Вкладки */
 .tabs {
-    display: flex; 
-    overflow-x: auto; 
-    gap: 15px; 
-    margin-bottom: 15px; 
-    padding-bottom: 5px;
-    border-bottom: 1px solid #ddd; 
-    -webkit-overflow-scrolling: touch;
-    flex-shrink: 0; /* Запрещаем меню сжиматься */
+    display: flex; overflow-x: auto; gap: 15px; margin-bottom: 20px; padding-bottom: 5px;
+    border-bottom: 1px solid #eee; -webkit-overflow-scrolling: touch;
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab-btn {
@@ -129,14 +94,8 @@ body {
 }
 .tab-btn.active { border-bottom-color: var(--primary); }
 
-/* ─── КОНТЕНТ (ПРОКРУЧИВАЕМЫЙ) ─── */
-.tab-content { 
-    flex: 1; /* Занимает всё оставшееся место */
-    overflow-y: auto; /* Включаем прокрутку только здесь */
-    padding-bottom: 20px; /* Отступ снизу, чтобы контент не прилипал к краю */
-    -webkit-overflow-scrolling: touch;
-}
-
+/* Контент */
+.tab-content { flex: 1; }
 h3 { font-size: 20px; margin-bottom: 15px; font-weight: bold; }
 
 .card {
