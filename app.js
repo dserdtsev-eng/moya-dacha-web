@@ -618,25 +618,40 @@ function renderQRElectro(area, plot, summary) {
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
-    // Заменяем русские буквы на латиницу (транслит) для теста
-    const translit = (str) => {
-        const map = { 'а':'a', 'б':'b', 'в':'v', 'г':'g', 'д':'d', 'е':'e', 'ё':'e', 'ж':'zh', 'з':'z', 'и':'i', 'й':'y', 'к':'k', 'л':'l', 'м':'m', 'н':'n', 'о':'o', 'п':'p', 'р':'r', 'с':'s', 'т':'t', 'у':'u', 'ф':'f', 'х':'h', 'ц':'ts', 'ч':'ch', 'ш':'sh', 'щ':'sch', 'ъ':'', 'ы':'y', 'ь':'', 'э':'e', 'ю':'yu', 'я':'ya' };
-        return String(str || '').split('').map(c => map[c.toLowerCase()] || c).join('');
+    // Перевод строки в кодировку Windows-1251 (стандарт для банков РФ)
+    const toWin1251 = (str) => {
+        if (!str) return '';
+        const win1251 = {
+            'А':0xC0,'Б':0xC1,'В':0xC2,'Г':0xC3,'Д':0xC4,'Е':0xC5,'Ё':0xA8,'Ж':0xC6,'З':0xC7,'И':0xC8,'Й':0xC9,'К':0xCA,'Л':0xCB,'М':0xCC,'Н':0xCD,'О':0xCE,'П':0xCF,'Р':0xD0,'С':0xD1,'Т':0xD2,'У':0xD3,'Ф':0xD4,'Х':0xD5,'Ц':0xD6,'Ч':0xD7,'Ш':0xD8,'Щ':0xD9,'Ъ':0xDA,'Ы':0xDB,'Ь':0xDC,'Э':0xDD,'Ю':0xDE,'Я':0xDF,
+            'а':0xE0,'б':0xE1,'в':0xE2,'г':0xE3,'д':0xE4,'е':0xE5,'ё':0xB8,'ж':0xE6,'з':0xE7,'и':0xE8,'й':0xE9,'к':0xEA,'л':0xEB,'м':0xEC,'н':0xED,'о':0xEE,'п':0xEF,'р':0xF0,'с':0xF1,'т':0xF2,'у':0xF3,'ф':0xF4,'х':0xF5,'ц':0xF6,'ч':0xF7,'ш':0xF8,'щ':0xF9,'ъ':0xFA,'ы':0xFB,'ь':0xFC,'э':0xFD,'ю':0xFE,'я':0xFF
+        };
+        let result = '';
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+            const code = win1251[char];
+            if (code) {
+                result += String.fromCharCode(code);
+            } else {
+                result += char; // Оставляем цифры и латиницу как есть
+            }
+        }
+        return result;
     };
 
-    const clean = (str) => translit(String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim());
+    // Очистка от запрещенных символов
+    const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
 
     return [
         'ST00012',
-        'Name=' + clean(req.name || 'SNT NADEZHDA'),
+        'Name=' + toWin1251(clean(req.name || 'СНТ НАДЕЖДА')),
         'PersonalAcc=' + clean(req.personal_acc),
-        'BankName=' + clean(req.bank_name),
+        'BankName=' + toWin1251(clean(req.bank_name)),
         'BIC=' + clean(req.bic),
         'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
         'PayeeINN=' + clean(req.inn),
         'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + clean(purpose)
+        'Purpose=' + toWin1251(clean(purpose))
     ].join('|');
 }
 
