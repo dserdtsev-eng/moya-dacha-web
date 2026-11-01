@@ -513,16 +513,18 @@ function renderQRVznos(area, plot, totalDebt) {
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
     
-    setTimeout(() => {
-        const qrTarget = document.getElementById('qr-target');
-        if (qrTarget) {
-            new QRCode(qrTarget, {
-                text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.L
-            });
-            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-        }
-    }, 100);
-}
+    // Вместо setTimeout с new QRCode(...) вставь это:
+    const qrTarget = document.getElementById('qr-target');
+    if (qrTarget) {
+        qrTarget.innerHTML = `
+            <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left;">
+                <strong>Строка для банка (скопируйте):</strong><br><br>
+                ${qrData}
+            </div>
+        `;
+        // Кнопку "Сохранить" можно временно отключить или оставить пустой
+        document.getElementById('save-qr-btn').style.display = 'none';
+    }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
 function renderQRElectro(area, plot, summary) {
@@ -582,16 +584,18 @@ function renderQRElectro(area, plot, summary) {
         const purpose = `${plot.street} ${plot.house}, электроэнергия`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
-        setTimeout(() => {
-            const qrTarget = document.getElementById('qr-target');
-            if (qrTarget) {
-                qrTarget.innerHTML = '';
-                new QRCode(qrTarget, {
-                    text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.L
-                });
-                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-            }
-        }, 100);
+    // Вместо setTimeout с new QRCode(...) вставь это:
+    const qrTarget = document.getElementById('qr-target');
+    if (qrTarget) {
+        qrTarget.innerHTML = `
+            <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left;">
+                <strong>Строка для банка (скопируйте):</strong><br><br>
+                ${qrData}
+            </div>
+        `;
+        // Кнопку "Сохранить" можно временно отключить или оставить пустой
+        document.getElementById('save-qr-btn').style.display = 'none';
+    }
     };
 }
 
