@@ -517,12 +517,20 @@ function renderQRVznos(area, plot, totalDebt) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             qrTarget.innerHTML = '';
-            // Используем новую библиотеку QRCode (soldair)
-            QRCode.toCanvas(qrData, { width: 240, margin: 2 }, function (error, canvas) {
-                if (error) { console.error(error); return; }
-                qrTarget.appendChild(canvas);
+            const encodedData = encodeURIComponent(qrData);
+            const img = document.createElement('img');
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodedData}`;
+            img.style.width = '240px';
+            img.style.height = '240px';
+            img.style.display = 'block';
+            
+            img.onload = () => {
+                qrTarget.appendChild(img);
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-            });
+            };
+            img.onerror = () => {
+                qrTarget.innerHTML = '<p class="error">Ошибка загрузки QR-кода</p>';
+            };
         }
     }, 100);
 }
@@ -589,12 +597,20 @@ function renderQRElectro(area, plot, summary) {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
                 qrTarget.innerHTML = '';
-                // Используем новую библиотеку QRCode (soldair)
-                QRCode.toCanvas(qrData, { width: 240, margin: 2 }, function (error, canvas) {
-                    if (error) { console.error(error); return; }
-                    qrTarget.appendChild(canvas);
+                const encodedData = encodeURIComponent(qrData);
+                const img = document.createElement('img');
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodedData}`;
+                img.style.width = '240px';
+                img.style.height = '240px';
+                img.style.display = 'block';
+                
+                img.onload = () => {
+                    qrTarget.appendChild(img);
                     document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-                });
+                };
+                img.onerror = () => {
+                    qrTarget.innerHTML = '<p class="error">Ошибка загрузки QR-кода</p>';
+                };
             }
         }, 100);
     };
