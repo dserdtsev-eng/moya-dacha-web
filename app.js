@@ -517,7 +517,7 @@ function renderQRVznos(area, plot, totalDebt) {
     if (qrTarget) {
         // Используем Google Chart API (работает в РФ без VPN)
         const encodedData = encodeURIComponent(qrData);
-        qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR">`;
+        qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR" referrerpolicy="no-referrer">`;
         document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
     }
 }
@@ -583,7 +583,7 @@ function renderQRElectro(area, plot, summary) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             const encodedData = encodeURIComponent(qrData);
-            qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR">`;
+            qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR" referrerpolicy="no-referrer">`;
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
     };
@@ -609,37 +609,39 @@ function buildPaymentQR(plot, amount, purpose) {
     ].join('|');
 }
 
-function saveQRToGallery(containerId) {
+async function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
-    const canvas = container.querySelector('canvas');
     const img = container.querySelector('img');
-
-    let dataUrl = '';
-    // Если библиотека отрисовала canvas (в современных браузерах) - берем его
-    if (canvas) {
-        dataUrl = canvas.toDataURL("image/png");
-    } 
-    // Если отрисовала img (в некоторых браузерах)
-    else if (img && img.src) {
-        dataUrl = img.src;
-    }
-
-    if (!dataUrl || dataUrl === 'data:,') {
-        alert('QR-код ещё не сгенерирован. Подождите секунду и попробуйте снова.');
+    if (!img || !img.src) {
+        alert('QR-код ещё не сгенерирован.');
         return;
     }
 
-    // Создаем виртуальную ссылку для скачивания
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
-    const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
-    a.download = `QR_${street}_${house}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+        // Скачиваем картинку как файл (чтобы обойти ограничения браузера)
+        const response = await fetch(img.src);
+        const blob = await response.blob();
+        
+        // Создаем ссылку на скачивание
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
+        const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
+        a.download = `QR_${street}_${house}.png`;
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Очищаем память
+        window.URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error(e);
+        alert('Не удалось сохранить QR-код. Попробуйте сделать скриншот экрана.');
+    }
 }
 
 // ─── ОБРАБОТЧИКИ ШАПКИ ───
