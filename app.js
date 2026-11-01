@@ -605,22 +605,24 @@ function renderQRElectro(area, plot, summary) {
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
-    const encodeValue = (val) => {
-        if (!val) return '';
-        return encodeURIComponent(String(val).replace(/\|/g, ' ').replace(/=/g, ' ').trim());
+    
+    // Очищаем строку от запрещенных символов | и =
+    const clean = (str) => {
+        if (!str) return '';
+        return String(str).replace(/\|/g, ' ').replace(/=/g, ' ').trim();
     };
 
     return [
         'ST00012',
-        'Name=' + encodeValue(req.name || 'СНТ НАДЕЖДА'),
-        'PersonalAcc=' + encodeValue(req.personal_acc),
-        'BankName=' + encodeValue(req.bank_name),
-        'BIC=' + encodeValue(req.bic),
-        'CorrespAcc=' + encodeValue(req.corr_acc || req.corresp_acc),
-        'PayeeINN=' + encodeValue(req.inn),
-        'KPP=' + encodeValue(req.kpp),
+        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
+        'PersonalAcc=' + clean(req.personal_acc),
+        'BankName=' + clean(req.bank_name),
+        'BIC=' + clean(req.bic),
+        'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
+        'PayeeINN=' + clean(req.inn),
+        'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + encodeValue(purpose)
+        'Purpose=' + clean(purpose)
     ].join('|');
 }
 
