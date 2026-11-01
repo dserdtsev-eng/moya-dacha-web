@@ -615,14 +615,37 @@ function renderQRElectro(area, plot, summary) {
 }
 
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
+// ⚠️ ВАЖНО: Переопределяем внутреннюю функцию qrcode-generator
+// чтобы она корректно переводила русские буквы в UTF-8
+qrcode.stringToBytes = function(s) {
+    var utf8 = [];
+    for (var i = 0; i < s.length; i++) {
+        var charcode = s.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+            utf8.push(0xc0 | (charcode >> 6), 0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+            utf8.push(0xe0 | (charcode >> 12), 0x80 | ((charcode>>6) & 0x3f), 0x80 | (charcode & 0x3f));
+        }
+        else {
+            i++;
+            charcode = 0x10000 + (((charcode & 0x3ff)<<10) | (s.charCodeAt(i) & 0x3ff));
+            utf8.push(0xf0 | (charcode >>18), 0x80 | ((charcode>>12) & 0x3f), 0x80 | ((charcode>>6) & 0x3f), 0x80 | (charcode & 0x3f));
+        }
+    }
+    return utf8;
+};
+
+// ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
     // Очистка от запрещенных символов
     const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
 
-    // Собираем строку БЕЗ кодирования (как есть, в UTF-8)
-    const qrString = [
+    // Собираем чистую строку ST00012 (без encodeURIComponent и BOM)
+    return [
         'ST00012',
         'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
         'PersonalAcc=' + clean(req.personal_acc),
@@ -634,12 +657,6 @@ function buildPaymentQR(plot, amount, purpose) {
         'Sum=' + Math.round(amount * 100),
         'Purpose=' + clean(purpose)
     ].join('|');
-
-    // ⚠️ ДОБАВЛЯЕМ BOM (Byte Order Mark) для UTF-8
-    // Это три невидимых символа, которые говорят сканеру: "это UTF-8!"
-    const BOM = '\uFEFF';
-    
-    return BOM + qrString;
 }
 
 function saveQRToGallery(containerId) {
