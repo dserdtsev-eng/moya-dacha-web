@@ -483,6 +483,7 @@ function renderQRTab(plot, plotId, content) {
 }
 
 // ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
+// ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
 function renderQRVznos(area, plot, totalDebt) {
     if (totalDebt <= 0) {
         area.innerHTML = `
@@ -506,25 +507,22 @@ function renderQRVznos(area, plot, totalDebt) {
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
             <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
-            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
 
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
     
-    // Вместо setTimeout с new QRCode(...) вставь это:
     const qrTarget = document.getElementById('qr-target');
     if (qrTarget) {
         qrTarget.innerHTML = `
-            <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left;">
+            <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left; width: 100%;">
                 <strong>Строка для банка (скопируйте):</strong><br><br>
                 ${qrData}
             </div>
         `;
-        // Кнопку "Сохранить" можно временно отключить или оставить пустой
-        document.getElementById('save-qr-btn').style.display = 'none';
     }
+}
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
 function renderQRElectro(area, plot, summary) {
@@ -551,7 +549,6 @@ function renderQRElectro(area, plot, summary) {
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
             <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
-            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
 
@@ -584,21 +581,17 @@ function renderQRElectro(area, plot, summary) {
         const purpose = `${plot.street} ${plot.house}, электроэнергия`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
-    // Вместо setTimeout с new QRCode(...) вставь это:
-    const qrTarget = document.getElementById('qr-target');
-    if (qrTarget) {
-        qrTarget.innerHTML = `
-            <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left;">
-                <strong>Строка для банка (скопируйте):</strong><br><br>
-                ${qrData}
-            </div>
-        `;
-        // Кнопку "Сохранить" можно временно отключить или оставить пустой
-        document.getElementById('save-qr-btn').style.display = 'none';
-    }
+        const qrTarget = document.getElementById('qr-target');
+        if (qrTarget) {
+            qrTarget.innerHTML = `
+                <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left; width: 100%;">
+                    <strong>Строка для банка (скопируйте):</strong><br><br>
+                    ${qrData}
+                </div>
+            `;
+        }
     };
 }
-
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
