@@ -513,13 +513,19 @@ function renderQRVznos(area, plot, totalDebt) {
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
     
-    const qrTarget = document.getElementById('qr-target');
-    if (qrTarget) {
-        // Используем Google Chart API (работает в РФ без VPN)
-        const encodedData = encodeURIComponent(qrData);
-        qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR" referrerpolicy="no-referrer">`;
-        document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-    }
+    setTimeout(() => {
+        const qrTarget = document.getElementById('qr-target');
+        if (qrTarget) {
+            qrTarget.innerHTML = '';
+            const qr = qrcode(0, 'M');
+            qr.addData(qrData);
+            qr.make();
+            qrTarget.innerHTML = qr.createImgTag(5, 5);
+            const img = qrTarget.querySelector('img');
+            if (img) { img.style.width = '240px'; img.style.height = '240px'; img.style.display = 'block'; }
+            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+        }
+    }, 100);
 }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
@@ -580,32 +586,41 @@ function renderQRElectro(area, plot, summary) {
         const purpose = `${plot.street} ${plot.house}, электроэнергия, показание: ${val}`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
-        const qrTarget = document.getElementById('qr-target');
-        if (qrTarget) {
-            const encodedData = encodeURIComponent(qrData);
-            qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR" referrerpolicy="no-referrer">`;
-            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-        }
+        setTimeout(() => {
+            const qrTarget = document.getElementById('qr-target');
+            if (qrTarget) {
+                qrTarget.innerHTML = '';
+                const qr = qrcode(0, 'M');
+                qr.addData(qrData);
+                qr.make();
+                qrTarget.innerHTML = qr.createImgTag(5, 5);
+                const img = qrTarget.querySelector('img');
+                if (img) { img.style.width = '240px'; img.style.height = '240px'; img.style.display = 'block'; }
+                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+            }
+        }, 100);
     };
 }
 
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
-    
-    const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
+    const encodeValue = (val) => {
+        if (!val) return '';
+        return encodeURIComponent(String(val).replace(/\|/g, ' ').replace(/=/g, ' ').trim());
+    };
 
     return [
         'ST00012',
-        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
-        'PersonalAcc=' + clean(req.personal_acc),
-        'BankName=' + clean(req.bank_name),
-        'BIC=' + clean(req.bic),
-        'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
-        'PayeeINN=' + clean(req.inn),
-        'KPP=' + clean(req.kpp),
+        'Name=' + encodeValue(req.name || 'СНТ НАДЕЖДА'),
+        'PersonalAcc=' + encodeValue(req.personal_acc),
+        'BankName=' + encodeValue(req.bank_name),
+        'BIC=' + encodeValue(req.bic),
+        'CorrespAcc=' + encodeValue(req.corr_acc || req.corresp_acc),
+        'PayeeINN=' + encodeValue(req.inn),
+        'KPP=' + encodeValue(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + clean(purpose)
+        'Purpose=' + encodeValue(purpose)
     ].join('|');
 }
 
