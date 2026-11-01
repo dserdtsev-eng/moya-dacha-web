@@ -604,30 +604,19 @@ function renderQRElectro(area, plot, summary) {
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
-    // Функция для перевода русской строки в Base64 (UTF-8)
-    const toBase64 = (str) => {
-        if (!str) return '';
-        try {
-            return btoa(unescape(encodeURIComponent(str)));
-        } catch (e) {
-            return str;
-        }
-    };
-
     const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
 
-    // Возвращаем строку, где русские поля закодированы в Base64
     return [
         'ST00012',
-        'Name=' + toBase64(clean(req.name || 'СНТ НАДЕЖДА')),
+        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
         'PersonalAcc=' + clean(req.personal_acc),
-        'BankName=' + toBase64(clean(req.bank_name)),
+        'BankName=' + clean(req.bank_name),
         'BIC=' + clean(req.bic),
         'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
         'PayeeINN=' + clean(req.inn),
         'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + toBase64(clean(purpose))
+        'Purpose=' + clean(purpose)
     ].join('|');
 }
 
