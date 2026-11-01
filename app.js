@@ -618,30 +618,25 @@ function renderQRElectro(area, plot, summary) {
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
-    // Очистка от запрещенных символов и жесткое ограничение длины
-    const clean = (str, maxLen) => {
-        let s = String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
-        if (s.length > maxLen) s = s.substring(0, maxLen);
-        return s;
+    // Заменяем русские буквы на латиницу (транслит) для теста
+    const translit = (str) => {
+        const map = { 'а':'a', 'б':'b', 'в':'v', 'г':'g', 'д':'d', 'е':'e', 'ё':'e', 'ж':'zh', 'з':'z', 'и':'i', 'й':'y', 'к':'k', 'л':'l', 'м':'m', 'н':'n', 'о':'o', 'п':'p', 'р':'r', 'с':'s', 'т':'t', 'у':'u', 'ф':'f', 'х':'h', 'ц':'ts', 'ч':'ch', 'ш':'sh', 'щ':'sch', 'ъ':'', 'ы':'y', 'ь':'', 'э':'e', 'ю':'yu', 'я':'ya' };
+        return String(str || '').split('').map(c => map[c.toLowerCase()] || c).join('');
     };
-    
-    // Функция для правильного перевода русских букв в UTF-8
-    const encodeValue = (val) => {
-        if (!val) return '';
-        return encodeURIComponent(String(val).replace(/\|/g, ' ').replace(/=/g, ' ').trim());
-    };
+
+    const clean = (str) => translit(String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim());
 
     return [
         'ST00012',
-        'Name=' + encodeValue(req.name || 'СНТ НАДЕЖДА'),
-        'PersonalAcc=' + encodeValue(req.personal_acc),
-        'BankName=' + encodeValue(req.bank_name),
-        'BIC=' + encodeValue(req.bic),
-        'CorrespAcc=' + encodeValue(req.corr_acc || req.corresp_acc),
-        'PayeeINN=' + encodeValue(req.inn),
-        'KPP=' + encodeValue(req.kpp),
+        'Name=' + clean(req.name || 'SNT NADEZHDA'),
+        'PersonalAcc=' + clean(req.personal_acc),
+        'BankName=' + clean(req.bank_name),
+        'BIC=' + clean(req.bic),
+        'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
+        'PayeeINN=' + clean(req.inn),
+        'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + encodeValue(purpose)
+        'Purpose=' + clean(purpose)
     ].join('|');
 }
 
