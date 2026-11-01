@@ -612,6 +612,7 @@ function buildPaymentQR(plot, amount, purpose) {
         return String(str).replace(/\|/g, ' ').replace(/=/g, ' ').trim();
     };
 
+    // Формируем строку сразу с русским текстом (без encodeURIComponent)
     return [
         'ST00012',
         'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
@@ -621,7 +622,7 @@ function buildPaymentQR(plot, amount, purpose) {
         'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
         'PayeeINN=' + clean(req.inn),
         'KPP=' + clean(req.kpp),
-        'Sum=' + Math.round(amount * 100),
+        'Sum=' + Math.round(amount * 100), // Сумма строго цифрами
         'Purpose=' + clean(purpose)
     ].join('|');
 }
