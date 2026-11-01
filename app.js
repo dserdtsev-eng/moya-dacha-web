@@ -258,72 +258,97 @@ function getElectricSummary(plot) {
 // ─── РЕНДЕР ВКЛАДОК ───
 function renderTab(tab) {
     if (!currentPlot || !currentPlot.data) return;
+    
     const content = document.getElementById('tab-content');
-    const plotId = currentPlot.id;
-    const plot = currentPlot.data;
-    const settings = appData.settings;
+    if (!content) return;
 
-    if (tab === 'debts') {
-        const totalDebt = getTotalDebt(plot, plotId);
-        let html = '<h3>Задолженности</h3>';
-        if (totalDebt === 0) {
-            html += '<div class="card card-blue" style="text-align:center; font-size:18px; font-weight:bold; padding:30px 20px;">✓ Задолженностей по взносам нет</div>';
-        } else {
-            html += `<div class="card card-blue"><div style="font-size: 18px; margin-bottom: 10px;">Общая сумма долга</div><div style="font-size: 32px; font-weight: bold; color: var(--primary);">${formatMoney(totalDebt)}</div></div>`;
-            html += `<div class="card"><div class="row"><span>За текущий период</span><span>${formatMoney(getMemberDebt(plot, plotId) + getTargetDebt(plot, plotId))}</span></div><div class="row"><span>За прошлый период</span><span>${formatMoney(getPrevMemberDebt(plot, plotId) + getPrevTargetDebt(plot, plotId))}</span></div></div>`;
+    try {
+        const plotId = currentPlot.id;
+        const plot = currentPlot.data;
+        const settings = appData.settings;
+
+        // === ВКЛАДКА: ДОЛГИ ===
+        if (tab === 'debts') {
+            const totalDebt = getTotalDebt(plot, plotId);
+            let html = '<h3>Задолженности</h3>';
+            if (totalDebt === 0) {
+                html += '<div class="card card-blue" style="text-align:center; font-size:18px; font-weight:bold; padding:30px 20px;">✓ Задолженностей по взносам нет</div>';
+            } else {
+                html += `<div class="card card-blue"><div style="font-size: 18px; margin-bottom: 10px;">Общая сумма долга</div><div style="font-size: 32px; font-weight: bold; color: var(--primary);">${formatMoney(totalDebt)}</div></div>`;
+                html += `<div class="card"><div class="row"><span>За текущий период</span><span>${formatMoney(getMemberDebt(plot, plotId) + getTargetDebt(plot, plotId))}</span></div><div class="row"><span>За прошлый период</span><span>${formatMoney(getPrevMemberDebt(plot, plotId) + getPrevTargetDebt(plot, plotId))}</span></div></div>`;
+            }
+            content.innerHTML = html;
         }
-        content.innerHTML = html;
-    }
-    else if (tab === 'payments') {
-        const payments = (appData.payments || []).filter(p => String(p.plot) === String(plotId)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        let html = '<h3>История платежей</h3>';
-        if (payments.length === 0) html += '<p>Платежей пока нет</p>';
-        else payments.forEach(p => {
-            let periodText = p.period === 'prev' ? 'прошлый период' : (p.period === 'current' ? 'текущий период' : '');
-            html += `<div class="card"><div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(p.date)}</div><div class="row" style="padding:0;"><span style="font-size: 18px;">${p.description || 'Платёж'}</span><span style="font-size: 20px; color: var(--primary);">${formatMoney(Number(p.amount))}</span></div>${periodText ? `<div style="font-size: 14px; color: var(--text-light); margin-top: 5px;">${periodText}</div>` : ''}</div>`;
-        });
-        content.innerHTML = html;
-    }
-    else if (tab === 'readings') {
-        const readings = (plot.meter_readings || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        let html = '<h3>Показания счётчиков</h3>';
-        if (readings.length === 0) html += '<p>Показаний пока нет</p>';
-        else readings.forEach(r => {
-            const val = r.values && r.values["1"] !== undefined ? r.values["1"] : '—';
-            html += `<div class="card"><div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(r.date)}</div><div class="row" style="padding:0;"><span style="font-size: 18px;">Счётчик</span><span style="font-size: 20px; font-weight: bold;">${val}</span></div></div>`;
-        });
-        content.innerHTML = html;
-    }
-    else if (tab === 'electric') {
-        const summary = getElectricSummary({ ...plot, id: plotId });
-        const lastRepl = getLastReplacementDate(plot);
-        let html = '<h3>Электричество</h3>';
-        html += `<div style="color: var(--text-light); margin-bottom: 15px;">Период: с ${lastRepl ? formatDateRu(lastRepl) : 'начала'} (после замены счётчика)</div>`;
-        html += `<div class="card"><h4 style="font-size: 18px; margin-bottom: 15px;">Баланс</h4><div class="row"><span>Оплачено, кВт·ч</span><span>${summary.paidKwh.toFixed(1)}</span></div><div class="row"><span>Израсходовано, кВт·ч</span><span>${summary.consumed.toFixed(1)}</span></div><div class="row total" style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;"><span>Итог</span><span style="color: ${summary.balance < 0 ? 'var(--error)' : 'var(--success)'}">${summary.balance.toFixed(1)}</span></div></div>`;
-        html += `<h4 style="font-size: 18px; margin-top: 25px; margin-bottom: 15px;">Оплаченные кВт·ч</h4>`;
-        const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-        const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a,b) => b.date.localeCompare(a.date));
-        if (ePayments.length === 0) html += '<p>Платежей за электричество нет</p>';
-        else ePayments.forEach(p => {
-            let tPrice = 0;
-            for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
-            const kwh = tPrice > 0 ? (p.amount / tPrice).toFixed(0) : '—';
-            html += `<div class="card"><div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(p.date)}</div><div class="row" style="padding:0;"><div style="font-size: 14px; color: var(--text-light);">${formatMoney(p.amount)} ÷ ${Number(tPrice).toFixed(2)} ₽/кВт·ч</div><span style="font-size: 20px; font-weight: bold;">${kwh}</span></div></div>`;
-        });
-        content.innerHTML = html;
-    }
-    else if (tab === 'qr') {
-        renderQRTab(plot, plotId, content);
-    }
-    else if (tab === 'deadlines') {
-        const feeStart = settings.fee_start_date || '—';
-        const feeEnd = feeStart !== '—' ? addYearMinusDay(feeStart) : '—';
-        let html = '<h3>Сроки оплаты</h3>';
-        if (Number(settings.member_fee) > 0) html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой членский взнос</div><div class="row" style="padding: 5px 0;"><span>Сумма:</span><span>${formatMoney(settings.member_fee)}</span></div><div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.member_deadline) || 'не указан'}</span></div></div>`;
-        if (Number(settings.target_fee) > 0) html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой целевой взнос</div><div class="row" style="padding: 5px 0;"><span>Сумма:</span><span>${formatMoney(settings.target_fee)}</span></div><div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.target_deadline) || 'не указан'}</span></div></div>`;
-        html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Электроэнергия</div><div class="row" style="padding: 5px 0;"><span>Срок:</span><span>до ${settings.electric_day} числа каждого месяца</span></div></div>`;
-        html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Период взносов</div><div class="row" style="padding: 5px 0;"><span>С:</span><span>${formatDateRu(feeStart)}</span></div><div class="row" style="padding: 5px 0;"><span>По:</span><span>${formatDateRu(feeEnd)}</span></div></div>`;
-        content.innerHTML = html;
+
+        // === ВКЛАДКА: ПЛАТЕЖИ ===
+        else if (tab === 'payments') {
+            const payments = (appData.payments || []).filter(p => String(p.plot) === String(plotId)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            let html = '<h3>История платежей</h3>';
+            if (payments.length === 0) html += '<p>Платежей пока нет</p>';
+            else payments.forEach(p => {
+                let periodText = p.period === 'prev' ? 'прошлый период' : (p.period === 'current' ? 'текущий период' : '');
+                html += `<div class="card"><div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(p.date)}</div><div class="row" style="padding:0;"><span style="font-size: 18px;">${p.description || 'Платёж'}</span><span style="font-size: 20px; color: var(--primary);">${formatMoney(Number(p.amount))}</span></div>${periodText ? `<div style="font-size: 14px; color: var(--text-light); margin-top: 5px;">${periodText}</div>` : ''}</div>`;
+            });
+            content.innerHTML = html;
+        }
+
+        // === ВКЛАДКА: ПОКАЗАНИЯ ===
+        else if (tab === 'readings') {
+            const readings = (plot.meter_readings || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            let html = '<h3>Показания счётчиков</h3>';
+            if (readings.length === 0) html += '<p>Показаний пока нет</p>';
+            else readings.forEach(r => {
+                const val = r.values && r.values["1"] !== undefined ? r.values["1"] : '—';
+                html += `<div class="card"><div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(r.date)}</div><div class="row" style="padding:0;"><span style="font-size: 18px;">Счётчик</span><span style="font-size: 20px; font-weight: bold;">${val}</span></div></div>`;
+            });
+            content.innerHTML = html;
+        }
+
+        // === ВКЛАДКА: ЭЛЕКТРО ===
+        else if (tab === 'electric') {
+            const summary = getElectricSummary({ ...plot, id: plotId });
+            const lastRepl = getLastReplacementDate(plot);
+            let html = '<h3>Электричество</h3>';
+            html += `<div style="color: var(--text-light); margin-bottom: 15px;">Период: с ${lastRepl ? formatDateRu(lastRepl) : 'начала'} (после замены счётчика)</div>`;
+            html += `<div class="card"><h4 style="font-size: 18px; margin-bottom: 15px;">Баланс</h4><div class="row"><span>Оплачено, кВт·ч</span><span>${summary.paidKwh.toFixed(1)}</span></div><div class="row"><span>Израсходовано, кВт·ч</span><span>${summary.consumed.toFixed(1)}</span></div><div class="row total" style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;"><span>Итог</span><span style="color: ${summary.balance < 0 ? 'var(--error)' : 'var(--success)'}">${summary.balance.toFixed(1)}</span></div></div>`;
+            html += `<h4 style="font-size: 18px; margin-top: 25px; margin-bottom: 15px;">Оплаченные кВт·ч</h4>`;
+            const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
+            const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a,b) => b.date.localeCompare(a.date));
+            if (ePayments.length === 0) html += '<p>Платежей за электричество нет</p>';
+            else ePayments.forEach(p => {
+                let tPrice = 0;
+                for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
+                const kwh = tPrice > 0 ? (p.amount / tPrice).toFixed(0) : '—';
+                html += `<div class="card"><div style="font-size: 16px; color: var(--text-light); margin-bottom: 5px;">${formatDateRu(p.date)}</div><div class="row" style="padding:0;"><div style="font-size: 14px; color: var(--text-light);">${formatMoney(p.amount)} ÷ ${Number(tPrice).toFixed(2)} ₽/кВт·ч</div><span style="font-size: 20px; font-weight: bold;">${kwh}</span></div></div>`;
+            });
+            content.innerHTML = html;
+        }
+
+        // === ВКЛАДКА: QR ===
+        else if (tab === 'qr') {
+            renderQRTab(plot, plotId, content);
+        }
+
+        // === ВКЛАДКА: СРОКИ ===
+        else if (tab === 'deadlines') {
+            const feeStart = settings.fee_start_date || '—';
+            const feeEnd = feeStart !== '—' ? addYearMinusDay(feeStart) : '—';
+            let html = '<h3>Сроки оплаты</h3>';
+            if (Number(settings.member_fee) > 0) html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой членский взнос</div><div class="row" style="padding: 5px 0;"><span>Сумма:</span><span>${formatMoney(settings.member_fee)}</span></div><div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.member_deadline) || 'не указан'}</span></div></div>`;
+            if (Number(settings.target_fee) > 0) html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой целевой взнос</div><div class="row" style="padding: 5px 0;"><span>Сумма:</span><span>${formatMoney(settings.target_fee)}</span></div><div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.target_deadline) || 'не указан'}</span></div></div>`;
+            html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Электроэнергия</div><div class="row" style="padding: 5px 0;"><span>Срок:</span><span>до ${settings.electric_day || '—'} числа каждого месяца</span></div></div>`;
+            html += `<div class="card"><div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Период взносов</div><div class="row" style="padding: 5px 0;"><span>С:</span><span>${formatDateRu(feeStart)}</span></div><div class="row" style="padding: 5px 0;"><span>По:</span><span>${formatDateRu(feeEnd)}</span></div></div>`;
+            content.innerHTML = html;
+        }
+
+    } catch (err) {
+        // Если что-то упало - выводим ошибку прямо на экран, чтобы не было пустоты
+        content.innerHTML = `<div class="card" style="color:red; font-size:16px; padding:20px;">
+            <b>Произошла ошибка при загрузке вкладки:</b><br><br>
+            ${err.message}<br><br>
+            <small>${err.stack}</small>
+        </div>`;
+        console.error(err);
     }
 }
 // ─── ВКЛАДКА «QR» ───
