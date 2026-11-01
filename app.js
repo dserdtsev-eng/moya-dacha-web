@@ -483,7 +483,6 @@ function renderQRTab(plot, plotId, content) {
 }
 
 // ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
-// ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
 function renderQRVznos(area, plot, totalDebt) {
     if (totalDebt <= 0) {
         area.innerHTML = `
@@ -505,23 +504,35 @@ function renderQRVznos(area, plot, totalDebt) {
         </div>
         <div style="text-align: center; margin-top: 20px;" id="qr-wrapper">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
-            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
+            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
 
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
     
-    const qrTarget = document.getElementById('qr-target');
-    if (qrTarget) {
-        qrTarget.innerHTML = `
-            <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left; width: 100%;">
-                <strong>Строка для банка (скопируйте):</strong><br><br>
-                ${qrData}
-            </div>
-        `;
-    }
+    setTimeout(() => {
+        const qrTarget = document.getElementById('qr-target');
+        if (qrTarget) {
+            qrTarget.innerHTML = '';
+            // Используем библиотеку qrcode-generator
+            const qr = qrcode(0, 'M');
+            qr.addData(qrData);
+            qr.make();
+            
+            // Вставляем картинку и делаем её нужного размера
+            qrTarget.innerHTML = qr.createImgTag(5, 5);
+            const img = qrTarget.querySelector('img');
+            if (img) { 
+                img.style.width = '240px'; 
+                img.style.height = '240px'; 
+                img.style.display = 'block'; 
+            }
+            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+        }
+    }, 100);
 }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
@@ -547,8 +558,9 @@ function renderQRElectro(area, plot, summary) {
         
         <div id="qr-electro-block" style="text-align: center; margin-top: 20px; display: none;">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
-            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
+            <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
 
@@ -578,20 +590,30 @@ function renderQRElectro(area, plot, summary) {
         sumDiv.textContent = formatMoney(sum);
         qrBlock.style.display = 'block';
 
-        const purpose = `${plot.street} ${plot.house}, электроэнергия`;
+        // ДОБАВЛЯЕМ ПОКАЗАНИЯ В НАЗНАЧЕНИЕ ПЛАТЕЖА
+        const purpose = `${plot.street} ${plot.house}, электроэнергия, показание: ${val}`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
-        const qrTarget = document.getElementById('qr-target');
-        if (qrTarget) {
-            qrTarget.innerHTML = `
-                <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 12px; word-break: break-all; text-align: left; width: 100%;">
-                    <strong>Строка для банка (скопируйте):</strong><br><br>
-                    ${qrData}
-                </div>
-            `;
-        }
+        setTimeout(() => {
+            const qrTarget = document.getElementById('qr-target');
+            if (qrTarget) {
+                qrTarget.innerHTML = '';
+                const qr = qrcode(0, 'M');
+                qr.addData(qrData);
+                qr.make();
+                qrTarget.innerHTML = qr.createImgTag(5, 5);
+                const img = qrTarget.querySelector('img');
+                if (img) { 
+                    img.style.width = '240px'; 
+                    img.style.height = '240px'; 
+                    img.style.display = 'block'; 
+                }
+                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+            }
+        }, 100);
     };
 }
+
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
