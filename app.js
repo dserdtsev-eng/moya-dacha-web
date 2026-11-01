@@ -418,8 +418,11 @@ function makeQRInto(containerId, data) {
 
 // ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
 function renderQRVznos(area, plot, totalDebt) {
-    // Если долга нет — показываем две карточки и ВЫХОДИМ, QR не генерируем
-    if (totalDebt <= 0) {
+    // Принудительно превращаем в число и округляем до копеек
+    const debt = Math.round(Number(totalDebt) * 100) / 100;
+
+    // Если долг 0 или меньше — показываем заглушку и ЖЕСТКО выходим
+    if (debt <= 0) {
         area.innerHTML = `
             <div class="card card-blue" style="text-align: center; padding: 20px;">
                 <div style="font-size: 18px;">Сумма к оплате</div>
@@ -429,14 +432,14 @@ function renderQRVznos(area, plot, totalDebt) {
                 Нет задолженности по взносам
             </div>
         `;
-        return; // <--- ВАЖНО: останавливаем функцию, чтобы QR не рисовался
+        return; // <--- ГЕНЕРАЦИЯ QR НЕ ЗАПУСТИТСЯ
     }
 
-    // Если долг есть — показываем сумму и генерируем QR
+    // Генерация QR (сработает только если есть долг)
     area.innerHTML = `
         <div class="card card-blue" style="text-align: center; padding: 20px;">
             <div style="font-size: 18px;">Сумма к оплате</div>
-            <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">${formatMoney(totalDebt)}</div>
+            <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">${formatMoney(debt)}</div>
         </div>
         <div style="text-align: center; margin-top: 20px;">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
@@ -446,7 +449,7 @@ function renderQRVznos(area, plot, totalDebt) {
         </div>
     `;
     
-    const qrData = buildPaymentQR(plot, totalDebt, `${plot.street} ${plot.house}, взносы`);
+    const qrData = buildPaymentQR(plot, debt, `${plot.street} ${plot.house}, взносы`);
     if (makeQRInto('qr-target', qrData)) {
         const btn = document.getElementById('save-qr-btn');
         if (btn) btn.onclick = () => saveQRToGallery('qr-target');
