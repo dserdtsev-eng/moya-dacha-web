@@ -6,11 +6,23 @@ const JSON_FILE = 'snt_data.json';
 let appData = null;
 let currentPlot = null;
 
+// ─── ПЕРЕОПРЕДЕЛЕНИЕ КОДИРОВАНИЯ QR (1 символ = 1 байт) ───
+// Нужно для корректного ST00011 (Windows-1251).
+if (typeof qrcode !== 'undefined' && qrcode.stringToBytes) {
+    qrcode.stringToBytes = function (s) {
+        const bytes = [];
+        for (let i = 0; i < s.length; i++) {
+            bytes.push(s.charCodeAt(i) & 0xFF);
+        }
+        return bytes;
+    };
+}
+
 // ─── УТИЛИТЫ ───
 async function pbkdf2(password, saltBase64) {
     const enc = new TextEncoder();
     const salt = Uint8Array.from(atob(saltBase64), c => c.charCodeAt(0));
-    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), {name: 'PBKDF2'}, false, ['deriveBits']);
+    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']);
     const bits = await crypto.subtle.deriveBits({
         name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256'
     }, keyMaterial, 256);
@@ -41,16 +53,14 @@ async function loadData(isRefresh = false) {
         const response = await fetch(url);
         if (!response.ok) throw new Error('Не удалось скачать базу');
         appData = await response.json();
-        
+
         if (isRefresh && currentPlot) {
-            // Обновляем данные текущего участка без выхода на экран логина
             currentPlot.data = appData.plots[currentPlot.id];
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 if (btn.classList.contains('active')) {
                     renderTab(btn.dataset.tab);
                 }
             });
-            // Короткое уведомление об обновлении
             const toast = document.createElement('div');
             toast.textContent = 'Данные обновлены';
             toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--primary);color:white;padding:10px 20px;border-radius:20px;z-index:1000;';
@@ -59,7 +69,7 @@ async function loadData(isRefresh = false) {
         } else {
             initLoginScreen();
             showScreen('login-screen');
-            
+
             const savedPlotId = localStorage.getItem('snt_plot_id');
             if (savedPlotId && appData.plots[savedPlotId]) {
                 document.getElementById('street-select').value = appData.plots[savedPlotId].street;
@@ -81,7 +91,7 @@ function initLoginScreen() {
     const loginBtn = document.getElementById('login-btn');
 
     const streets = new Set();
-    Object.values(appData.plots).forEach(p => { if(p.street) streets.add(p.street); });
+    Object.values(appData.plots).forEach(p => { if (p.street) streets.add(p.street); });
 
     streetSelect.innerHTML = '<option value="">Выберите улицу</option>';
     Array.from(streets).sort().forEach(s => {
@@ -111,7 +121,7 @@ function initLoginScreen() {
         const plotId = houseSelect.value;
         const pwd = pwdInput.value;
         const errEl = document.getElementById('login-error');
-        
+
         errEl.textContent = 'Проверка...';
         const plot = appData.plots[plotId];
         try {
@@ -161,7 +171,6 @@ function renderDashboard() {
 
     renderTab('debts');
 }
-
 // ─── ЛОГИКА РАСЧЁТА ───
 function addYearMinusDay(dateStr) {
     if (!dateStr) return '';
@@ -246,35 +255,37 @@ function getLastReplacementDate(plot) {
 function getElectricSummary(plot) {
     const readings = plot.meter_readings || [];
     const lastRepl = getLastReplacementDate(plot);
-    
-    const relevantReadings = readings.filter(r => !lastRepl || (r.date || '') >= lastRepl).sort((a,b) => (a.date||'').localeCompare(b.date||''));
+
+    const relevantReadings = readings.filter(r => !lastRepl || (r.date || '') >= lastRepl).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const lastReading = relevantReadings[relevantReadings.length - 1];
     const lastVal = lastReading ? Number(lastReading.values["1"] || 0) : 0;
 
     let consumed = 0;
     for (let i = 1; i < relevantReadings.length; i++) {
         if (!relevantReadings[i].replaced) {
-            const v1 = Number(relevantReadings[i-1].values["1"] || 0);
+            const v1 = Number(relevantReadings[i - 1].values["1"] || 0);
             const v2 = Number(relevantReadings[i].values["1"] || 0);
             if (v2 > v1) consumed += (v2 - v1);
         }
     }
 
     let paidKwh = 0;
-    const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    const tariffs = (appData.tariffs || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     for (const p of (appData.payments || [])) {
         if (String(p.plot) !== String(plot.id) || !isElectricPayment(p.description)) continue;
         if (lastRepl && p.date < lastRepl) continue;
-        
+
         let tPrice = 0;
         for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
         if (tPrice > 0) paidKwh += (Number(p.amount) / tPrice);
     }
-    
+
     return { lastVal, consumed, paidKwh, balance: paidKwh - consumed };
 }
 // ─── РЕНДЕР ВКЛАДОК ───
 function renderTab(tab) {
+    if (!currentPlot || !currentPlot.data) return;
+
     const content = document.getElementById('tab-content');
     const plotId = currentPlot.id;
     const plot = currentPlot.data;
@@ -298,7 +309,7 @@ function renderTab(tab) {
         }
         content.innerHTML = html;
     }
-    
+
     else if (tab === 'payments') {
         const payments = (appData.payments || [])
             .filter(p => String(p.plot) === String(plotId))
@@ -367,9 +378,9 @@ function renderTab(tab) {
         </div>`;
 
         html += `<h4 style="font-size: 18px; margin-top: 25px; margin-bottom: 15px;">Оплаченные кВт·ч</h4>`;
-        const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-        const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a,b) => b.date.localeCompare(a.date));
-        
+        const tariffs = (appData.tariffs || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a, b) => b.date.localeCompare(a.date));
+
         if (ePayments.length === 0) {
             html += '<p>Платежей за электричество нет</p>';
         } else {
@@ -396,9 +407,9 @@ function renderTab(tab) {
     else if (tab === 'deadlines') {
         const feeStart = settings.fee_start_date || '—';
         const feeEnd = feeStart !== '—' ? addYearMinusDay(feeStart) : '—';
-        
+
         let html = '<h3>Сроки оплаты</h3>';
-        
+
         if (Number(settings.member_fee) > 0) {
             html += `<div class="card">
                 <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой членский взнос</div>
@@ -406,7 +417,7 @@ function renderTab(tab) {
                 <div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.member_deadline) || 'не указан'}</span></div>
             </div>`;
         }
-        
+
         if (Number(settings.target_fee) > 0) {
             html += `<div class="card">
                 <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой целевой взнос</div>
@@ -429,10 +440,9 @@ function renderTab(tab) {
         content.innerHTML = html;
     }
 }
-
 // ─── ВКЛАДКА «QR» ───
 function renderQRTab(plot, plotId, content) {
-    let totalDebt = getTotalDebt(plot, plotId);
+    const totalDebt = getTotalDebt(plot, plotId);
     const summary = getElectricSummary({ ...plot, id: plotId });
 
     let html = `
@@ -482,6 +492,29 @@ function renderQRTab(plot, plotId, content) {
     setActiveTab(true);
 }
 
+// ─── ХЕЛПЕР: СИНХРОННАЯ ГЕНЕРАЦИЯ QR ───
+function makeQRInto(containerId, data) {
+    const el = document.getElementById(containerId);
+    if (!el) return false;
+    el.innerHTML = '';
+    try {
+        const qr = qrcode(0, 'M');
+        qr.addData(data);
+        qr.make();
+        el.innerHTML = qr.createImgTag(5, 5);
+        const img = el.querySelector('img');
+        if (img) {
+            img.style.width = '240px';
+            img.style.height = '240px';
+            img.style.display = 'block';
+        }
+        return true;
+    } catch (e) {
+        el.textContent = 'Ошибка генерации QR: ' + e.message;
+        return false;
+    }
+}
+
 // ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
 function renderQRVznos(area, plot, totalDebt) {
     if (totalDebt <= 0) {
@@ -502,7 +535,7 @@ function renderQRVznos(area, plot, totalDebt) {
             <div style="font-size: 18px;">Сумма к оплате</div>
             <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">${formatMoney(totalDebt)}</div>
         </div>
-        <div style="text-align: center; margin-top: 20px;" id="qr-wrapper">
+        <div style="text-align: center; margin-top: 20px;">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
             <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
@@ -512,20 +545,10 @@ function renderQRVznos(area, plot, totalDebt) {
 
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
-    
-    setTimeout(() => {
-        const qrTarget = document.getElementById('qr-target');
-        if (qrTarget) {
-            qrTarget.innerHTML = '';
-            const qr = qrcode(0, 'M');
-            qr.addData(qrData);
-            qr.make();
-            qrTarget.innerHTML = qr.createImgTag(5, 5);
-            const img = qrTarget.querySelector('img');
-            if (img) { img.style.width = '240px'; img.style.height = '240px'; img.style.display = 'block'; }
-            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-        }
-    }, 100);
+    if (makeQRInto('qr-target', qrData)) {
+        const btn = document.getElementById('save-qr-btn');
+        if (btn) btn.onclick = () => saveQRToGallery('qr-target');
+    }
 }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
@@ -533,7 +556,7 @@ function renderQRElectro(area, plot, summary) {
     const today = todayStr();
     let currentTariff = 0;
     for (const t of (appData.tariffs || [])) { if (t.date <= today) currentTariff = t.price; }
-    
+
     area.innerHTML = `
         <div class="card">
             <div style="font-size: 18px; margin-bottom: 15px;">Текущее показание счётчика:</div>
@@ -566,7 +589,7 @@ function renderQRElectro(area, plot, summary) {
     input.oninput = () => {
         const val = parseFloat(input.value);
         const prev = summary.lastVal;
-        
+
         if (isNaN(val) || val <= prev) {
             deltaSpan.textContent = '0';
             sumDiv.textContent = '0,00 ₽';
@@ -578,7 +601,7 @@ function renderQRElectro(area, plot, summary) {
         errDiv.style.display = 'none';
         const delta = val - prev;
         const sum = delta * currentTariff;
-        
+
         deltaSpan.textContent = delta.toFixed(1);
         sumDiv.textContent = formatMoney(sum);
         qrBlock.style.display = 'block';
@@ -586,57 +609,43 @@ function renderQRElectro(area, plot, summary) {
         const purpose = `${plot.street} ${plot.house}, электроэнергия, показание: ${val}`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
-        setTimeout(() => {
-            const qrTarget = document.getElementById('qr-target');
-            if (qrTarget) {
-                qrTarget.innerHTML = '';
-                const qr = qrcode(0, 'M');
-                qr.addData(qrData);
-                qr.make();
-                qrTarget.innerHTML = qr.createImgTag(5, 5);
-                const img = qrTarget.querySelector('img');
-                if (img) { img.style.width = '240px'; img.style.height = '240px'; img.style.display = 'block'; }
-                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-            }
-        }, 100);
+        if (makeQRInto('qr-target', qrData)) {
+            const btn = document.getElementById('save-qr-btn');
+            if (btn) btn.onclick = () => saveQRToGallery('qr-target');
+        }
     };
+
+    if (input.value) input.dispatchEvent(new Event('input'));
 }
 
-// ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
+// ─── ГЕНЕРАЦИЯ QR-СТРОКИ ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
-    
-    // Принудительное кодирование строки в Windows-1251 (байты)
+
     const toWin1251 = (str) => {
         if (!str) return '';
-        const win1251Map = {
+        const map = {
             'А':0xC0,'Б':0xC1,'В':0xC2,'Г':0xC3,'Д':0xC4,'Е':0xC5,'Ё':0xA8,'Ж':0xC6,'З':0xC7,'И':0xC8,'Й':0xC9,'К':0xCA,'Л':0xCB,'М':0xCC,'Н':0xCD,'О':0xCE,'П':0xCF,'Р':0xD0,'С':0xD1,'Т':0xD2,'У':0xD3,'Ф':0xD4,'Х':0xD5,'Ц':0xD6,'Ч':0xD7,'Ш':0xD8,'Щ':0xD9,'Ъ':0xDA,'Ы':0xDB,'Ь':0xDC,'Э':0xDD,'Ю':0xDE,'Я':0xDF,
             'а':0xE0,'б':0xE1,'в':0xE2,'г':0xE3,'д':0xE4,'е':0xE5,'ё':0xB8,'ж':0xE6,'з':0xE7,'и':0xE8,'й':0xE9,'к':0xEA,'л':0xEB,'м':0xEC,'н':0xED,'о':0xEE,'п':0xEF,'р':0xF0,'с':0xF1,'т':0xF2,'у':0xF3,'ф':0xF4,'х':0xF5,'ц':0xF6,'ч':0xF7,'ш':0xF8,'щ':0xF9,'ъ':0xFA,'ы':0xFB,'ь':0xFC,'э':0xFD,'ю':0xFE,'я':0xFF
         };
         let result = '';
         for (let i = 0; i < str.length; i++) {
-            const char = str[i];
-            const code = win1251Map[char];
-            if (code !== undefined) {
-                // Превращаем код в символ (байт), который библиотека закодирует как есть
-                result += String.fromCharCode(code);
-            } else {
-                result += char; // Цифры и латиница остаются
-            }
+            const ch = str[i];
+            const code = map[ch];
+            result += (code !== undefined) ? String.fromCharCode(code) : ch;
         }
         return result;
     };
 
     const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
 
-    // ВАЖНО: Используем ST00011 (версия с Windows-1251) вместо ST00012 (UTF-8)
     return [
         'ST00011',
         'Name=' + toWin1251(clean(req.name || 'СНТ НАДЕЖДА')),
         'PersonalAcc=' + clean(req.personal_acc),
         'BankName=' + toWin1251(clean(req.bank_name)),
         'BIC=' + clean(req.bic),
-        'CorrespAcc=' + clean(req.corr_acc || req.corr_acc),
+        'CorrespAcc=' + clean(req.corr_acc),
         'PayeeINN=' + clean(req.inn),
         'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
@@ -644,24 +653,23 @@ function buildPaymentQR(plot, amount, purpose) {
     ].join('|');
 }
 
+// ─── СОХРАНЕНИЕ QR В ГАЛЕРЕЮ ───
 function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
-    // Ищем картинку внутри контейнера
+
     const img = container.querySelector('img');
     if (!img || !img.src) {
-        alert('QR-код ещё не сгенерирован. Подождите секунду.');
+        alert('QR-код ещё не сгенерирован.');
         return;
     }
 
-    // Создаем ссылку для скачивания прямо из data:image (без fetch)
     const a = document.createElement('a');
     a.href = img.src;
     const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
     const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
     a.download = `QR_${street}_${house}.png`;
-    
+
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -676,11 +684,11 @@ document.getElementById('logout-btn').onclick = () => {
 };
 
 document.getElementById('refresh-btn').onclick = () => {
-    loadData(true); // true = обновить без выхода на экран логина
+    loadData(true);
 };
 
 document.getElementById('info-btn').onclick = () => {
-    alert(`Моя дача — СНТ «Надежда»\n\n` + 
+    alert(`Моя дача — СНТ «Надежда»\n\n` +
           `Веб-версия личного кабинета садовода.\n\n` +
           `Вкладки «Долги», «Платежи» и «Показания» показывают данные из базы СНТ.\n\n` +
           `Вкладка «Электро» отображает баланс кВт·ч.\n\n` +
