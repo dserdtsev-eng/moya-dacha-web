@@ -4,6 +4,10 @@ const JSON_FILE = 'snt_data.json';
 
 let appData = null;
 let currentPlot = null;
+// Принудительно включаем встроенную поддержку UTF-8 для генератора QR
+if (typeof qrcode !== 'undefined' && qrcode.stringToBytesFuncs) {
+    qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+}
 
 // ─── УТИЛИТЫ ───
 async function pbkdf2(password, saltBase64) {
@@ -396,7 +400,7 @@ function makeQRInto(containerId, data) {
     el.innerHTML = '';
     try {
         const qr = qrcode(0, 'M');
-        qr.addData(data, 'Byte'); // <--- ЖЕСТКО УКАЗЫВАЕМ БАЙТОВЫЙ РЕЖИМ (UTF-8)
+        qr.addData(data); // <--- ЖЕСТКО УКАЗЫВАЕМ БАЙТОВЫЙ РЕЖИМ (UTF-8)
         qr.make();
         el.innerHTML = qr.createSvgTag({ scalable: true });
         const svg = el.querySelector('svg');
