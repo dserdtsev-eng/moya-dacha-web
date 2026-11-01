@@ -398,12 +398,12 @@ function makeQRInto(containerId, data) {
         const qr = qrcode(0, 'M');
         qr.addData(data);
         qr.make();
-        el.innerHTML = qr.createSvgTag({ scalable: true });
-        const svg = el.querySelector('svg');
-        if (svg) {
-            svg.style.width = '240px';
-            svg.style.height = '240px';
-            svg.style.display = 'block';
+        el.innerHTML = qr.createImgTag(5, 5);
+        const img = el.querySelector('img');
+        if (img) {
+            img.style.width = '240px';
+            img.style.height = '240px';
+            img.style.display = 'block';
         }
         return true;
     } catch (e) {
@@ -495,19 +495,35 @@ function renderQRElectro(area, plot, summary) {
 // ─── ГЕНЕРАЦИЯ QR-СТРОКИ (Чистый UTF-8 / ST00012) ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
+
+    const toWin1251 = (str) => {
+        if (!str) return '';
+        const map = {
+            'А':0xC0,'Б':0xC1,'В':0xC2,'Г':0xC3,'Д':0xC4,'Е':0xC5,'Ё':0xA8,'Ж':0xC6,'З':0xC7,'И':0xC8,'Й':0xC9,'К':0xCA,'Л':0xCB,'М':0xCC,'Н':0xCD,'О':0xCE,'П':0xCF,'Р':0xD0,'С':0xD1,'Т':0xD2,'У':0xD3,'Ф':0xD4,'Х':0xD5,'Ц':0xD6,'Ч':0xD7,'Ш':0xD8,'Щ':0xD9,'Ъ':0xDA,'Ы':0xDB,'Ь':0xDC,'Э':0xDD,'Ю':0xDE,'Я':0xDF,
+            'а':0xE0,'б':0xE1,'в':0xE2,'г':0xE3,'д':0xE4,'е':0xE5,'ё':0xB8,'ж':0xE6,'з':0xE7,'и':0xE8,'й':0xE9,'к':0xEA,'л':0xEB,'м':0xEC,'н':0xED,'о':0xEE,'п':0xEF,'р':0xF0,'с':0xF1,'т':0xF2,'у':0xF3,'ф':0xF4,'х':0xF5,'ц':0xF6,'ч':0xF7,'ш':0xF8,'щ':0xF9,'ъ':0xFA,'ы':0xFB,'ь':0xFC,'э':0xFD,'ю':0xFE,'я':0xFF
+        };
+        let result = '';
+        for (let i = 0; i < str.length; i++) {
+            const ch = str[i];
+            const code = map[ch];
+            result += (code !== undefined) ? String.fromCharCode(code) : ch;
+        }
+        return result;
+    };
+
     const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
 
     return [
-        'ST00012',
-        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
+        'ST00011',
+        'Name=' + toWin1251(clean(req.name || 'СНТ НАДЕЖДА')),
         'PersonalAcc=' + clean(req.personal_acc),
-        'BankName=' + clean(req.bank_name),
+        'BankName=' + toWin1251(clean(req.bank_name)),
         'BIC=' + clean(req.bic),
-        'CorrespAcc=' + clean(req.corr_acc),
+        'CorrespAcc=' + clean(req.corr_acc || req.corr_acc),
         'PayeeINN=' + clean(req.inn),
         'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + clean(purpose)
+        'Purpose=' + toWin1251(clean(purpose))
     ].join('|');
 }
 
@@ -515,27 +531,25 @@ function buildPaymentQR(plot, amount, purpose) {
 function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    const svg = container.querySelector('svg');
-    if (!svg) { alert('QR-код ещё не сгенерирован.'); return; }
+    
+    // Ищем картинку внутри контейнера (так как мы вернули createImgTag)
+    const img = container.querySelector('img');
+    if (!img || !img.src) {
+        alert('QR-код ещё не сгенерирован. Подождите секунду.');
+        return;
+    }
 
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
-    img.onload = function() {
-        canvas.width = img.width || 240;
-        canvas.height = img.height || 240;
-        ctx.drawImage(img, 0, 0);
-        const a = document.createElement('a');
-        const street = currentPlot?.data?.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
-        const house = currentPlot?.data?.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
-        a.download = `QR_${street}_${house}.png`;
-        a.href = canvas.toDataURL("image/png");
-        a.click();
-    };
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+    // Создаем ссылку для скачивания прямо из data:image
+    const a = document.createElement('a');
+    a.href = img.src;
+    const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
+    const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
+    a.download = `QR_${street}_${house}.png`;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
-
 // ─── ОБРАБОТЧИКИ ШАПКИ ───
 document.getElementById('logout-btn').onclick = () => {
     currentPlot = null;
