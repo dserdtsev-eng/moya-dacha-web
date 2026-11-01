@@ -418,10 +418,21 @@ function makeQRInto(containerId, data) {
 
 // ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
 function renderQRVznos(area, plot, totalDebt) {
+    // Если долга нет — показываем две карточки и ВЫХОДИМ, QR не генерируем
     if (totalDebt <= 0) {
-        area.innerHTML = `<div class="card card-blue" style="text-align: center; font-size: 20px; padding: 30px 20px;">Сумма к оплате<br><br><span style="font-size: 32px; font-weight: bold;">0,00 ₽</span></div><div class="card" style="text-align: center; font-size: 18px; color: var(--text-light); padding: 30px 20px;">Нет задолженности по взносам</div>`;
-        return;
+        area.innerHTML = `
+            <div class="card card-blue" style="text-align: center; padding: 20px;">
+                <div style="font-size: 18px;">Сумма к оплате</div>
+                <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">0,00 ₽</div>
+            </div>
+            <div class="card" style="text-align: center; font-size: 18px; color: var(--text-light); padding: 30px 20px;">
+                Нет задолженности по взносам
+            </div>
+        `;
+        return; // <--- ВАЖНО: останавливаем функцию, чтобы QR не рисовался
     }
+
+    // Если долг есть — показываем сумму и генерируем QR
     area.innerHTML = `
         <div class="card card-blue" style="text-align: center; padding: 20px;">
             <div style="font-size: 18px;">Сумма к оплате</div>
@@ -434,6 +445,7 @@ function renderQRVznos(area, plot, totalDebt) {
             <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
+    
     const qrData = buildPaymentQR(plot, totalDebt, `${plot.street} ${plot.house}, взносы`);
     if (makeQRInto('qr-target', qrData)) {
         const btn = document.getElementById('save-qr-btn');
