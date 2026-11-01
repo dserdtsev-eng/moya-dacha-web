@@ -517,20 +517,12 @@ function renderQRVznos(area, plot, totalDebt) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             qrTarget.innerHTML = '';
-            // Используем библиотеку qrcode-generator
-            const qr = qrcode(0, 'M');
-            qr.addData(qrData);
-            qr.make();
-            
-            // Вставляем картинку и делаем её нужного размера
-            qrTarget.innerHTML = qr.createImgTag(5, 5);
-            const img = qrTarget.querySelector('img');
-            if (img) { 
-                img.style.width = '240px'; 
-                img.style.height = '240px'; 
-                img.style.display = 'block'; 
-            }
-            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+            // Используем новую библиотеку QRCode (soldair)
+            QRCode.toCanvas(qrData, { width: 240, margin: 2 }, function (error, canvas) {
+                if (error) { console.error(error); return; }
+                qrTarget.appendChild(canvas);
+                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+            });
         }
     }, 100);
 }
@@ -590,7 +582,6 @@ function renderQRElectro(area, plot, summary) {
         sumDiv.textContent = formatMoney(sum);
         qrBlock.style.display = 'block';
 
-        // ДОБАВЛЯЕМ ПОКАЗАНИЯ В НАЗНАЧЕНИЕ ПЛАТЕЖА
         const purpose = `${plot.street} ${plot.house}, электроэнергия, показание: ${val}`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
@@ -598,17 +589,12 @@ function renderQRElectro(area, plot, summary) {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
                 qrTarget.innerHTML = '';
-                const qr = qrcode(0, 'M');
-                qr.addData(qrData);
-                qr.make();
-                qrTarget.innerHTML = qr.createImgTag(5, 5);
-                const img = qrTarget.querySelector('img');
-                if (img) { 
-                    img.style.width = '240px'; 
-                    img.style.height = '240px'; 
-                    img.style.display = 'block'; 
-                }
-                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+                // Используем новую библиотеку QRCode (soldair)
+                QRCode.toCanvas(qrData, { width: 240, margin: 2 }, function (error, canvas) {
+                    if (error) { console.error(error); return; }
+                    qrTarget.appendChild(canvas);
+                    document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+                });
             }
         }, 100);
     };
