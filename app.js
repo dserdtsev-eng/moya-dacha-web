@@ -517,7 +517,7 @@ function renderQRVznos(area, plot, totalDebt) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             new QRCode(qrTarget, {
-                text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
+                text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.L
             });
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
@@ -587,7 +587,7 @@ function renderQRElectro(area, plot, summary) {
             if (qrTarget) {
                 qrTarget.innerHTML = '';
                 new QRCode(qrTarget, {
-                    text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
+                    text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.L
                 });
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
@@ -598,17 +598,27 @@ function renderQRElectro(area, plot, summary) {
 // ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
+    
+    // Очистка от запрещенных символов и жесткое ограничение длины
+    const clean = (str, maxLen) => {
+        let s = String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
+        if (s.length > maxLen) s = s.substring(0, maxLen);
+        return s;
+    };
+    
+    // ВАЖНО: оставляем русский текст как есть (без encodeURIComponent),
+    // но сильно режем длину, чтобы библиотека не падала.
     return [
         'ST00012',
-        'Name=' + (req.name || 'СНТ НАДЕЖДА'),
-        'PersonalAcc=' + (req.personal_acc || ''),
-        'BankName=' + (req.bank_name || ''),
-        'BIC=' + (req.bic || ''),
-        'CorrespAcc=' + (req.corresp_acc || ''),
-        'PayeeINN=' + (req.inn || ''),
-        'KPP=' + (req.kpp || ''),
+        'Name=' + clean(req.name || 'СНТ НАДЕЖДА', 20),
+        'PersonalAcc=' + clean(req.personal_acc, 20),
+        'BankName=' + clean(req.bank_name, 15), // Режем банк до 15 символов
+        'BIC=' + clean(req.bic, 9),
+        'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc, 20),
+        'PayeeINN=' + clean(req.inn, 12),
+        'KPP=' + clean(req.kpp, 9),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + purpose
+        'Purpose=' + clean(purpose, 30) // Режем назначение до 30 символов
     ].join('|');
 }
 
