@@ -148,6 +148,7 @@ function renderDashboard() {
     });
     renderTab('debts');
 }
+
 // ─── ЛОГИКА РАСЧЁТА ───
 function addYearMinusDay(dateStr) {
     if (!dateStr) return '';
@@ -342,7 +343,6 @@ function renderTab(tab) {
         }
 
     } catch (err) {
-        // Если что-то упало - выводим ошибку прямо на экран, чтобы не было пустоты
         content.innerHTML = `<div class="card" style="color:red; font-size:16px; padding:20px;">
             <b>Произошла ошибка при загрузке вкладки:</b><br><br>
             ${err.message}<br><br>
@@ -396,7 +396,7 @@ function makeQRInto(containerId, data) {
     el.innerHTML = '';
     try {
         const qr = qrcode(0, 'M');
-        qr.addData(data);
+        qr.addData(data, 'Byte'); // <--- ЖЕСТКО УКАЗЫВАЕМ БАЙТОВЫЙ РЕЖИМ (UTF-8)
         qr.make();
         el.innerHTML = qr.createSvgTag({ scalable: true });
         const svg = el.querySelector('svg');
@@ -510,6 +510,7 @@ function buildPaymentQR(plot, amount, purpose) {
         'Purpose=' + clean(purpose)
     ].join('|');
 }
+
 // ─── СОХРАНЕНИЕ QR (SVG -> PNG) ───
 function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
@@ -534,6 +535,7 @@ function saveQRToGallery(containerId) {
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
 }
+
 // ─── ОБРАБОТЧИКИ ШАПКИ ───
 document.getElementById('logout-btn').onclick = () => {
     currentPlot = null;
