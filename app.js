@@ -513,26 +513,13 @@ function renderQRVznos(area, plot, totalDebt) {
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
     
-    setTimeout(() => {
-        const qrTarget = document.getElementById('qr-target');
-        if (qrTarget) {
-            qrTarget.innerHTML = '';
-            const encodedData = encodeURIComponent(qrData);
-            const img = document.createElement('img');
-            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodedData}`;
-            img.style.width = '240px';
-            img.style.height = '240px';
-            img.style.display = 'block';
-            
-            img.onload = () => {
-                qrTarget.appendChild(img);
-                document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-            };
-            img.onerror = () => {
-                qrTarget.innerHTML = '<p class="error">Ошибка загрузки QR-кода</p>';
-            };
-        }
-    }, 100);
+    const qrTarget = document.getElementById('qr-target');
+    if (qrTarget) {
+        // Используем Google Chart API (работает в РФ без VPN)
+        const encodedData = encodeURIComponent(qrData);
+        qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR">`;
+        document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+    }
 }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
@@ -593,26 +580,12 @@ function renderQRElectro(area, plot, summary) {
         const purpose = `${plot.street} ${plot.house}, электроэнергия, показание: ${val}`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
-        setTimeout(() => {
-            const qrTarget = document.getElementById('qr-target');
-            if (qrTarget) {
-                qrTarget.innerHTML = '';
-                const encodedData = encodeURIComponent(qrData);
-                const img = document.createElement('img');
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodedData}`;
-                img.style.width = '240px';
-                img.style.height = '240px';
-                img.style.display = 'block';
-                
-                img.onload = () => {
-                    qrTarget.appendChild(img);
-                    document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
-                };
-                img.onerror = () => {
-                    qrTarget.innerHTML = '<p class="error">Ошибка загрузки QR-кода</p>';
-                };
-            }
-        }, 100);
+        const qrTarget = document.getElementById('qr-target');
+        if (qrTarget) {
+            const encodedData = encodeURIComponent(qrData);
+            qrTarget.innerHTML = `<img src="https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodedData}&choe=UTF-8" style="width: 240px; height: 240px; display: block;" alt="QR">`;
+            document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
+        }
     };
 }
 
