@@ -273,7 +273,6 @@ function getElectricSummary(plot) {
     
     return { lastVal, consumed, paidKwh, balance: paidKwh - consumed };
 }
-
 // ─── РЕНДЕР ВКЛАДОК ───
 function renderTab(tab) {
     const content = document.getElementById('tab-content');
