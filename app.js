@@ -477,7 +477,7 @@ function renderQRVznos(area, plot, totalDebt) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             qrTarget.innerHTML = '';
-            const qr = qrcode(0, 'M');
+            const qr = qrcode(0, '3');
             qr.addData(qrData);
             qr.make();
             qrTarget.innerHTML = qr.createImgTag(5, 5);
@@ -548,7 +548,7 @@ function renderQRElectro(area, plot, summary) {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
                 qrTarget.innerHTML = '';
-                const qr = qrcode(0, 'M');
+                const qr = qrcode(0, '3');
                 qr.addData(qrData);
                 qr.make();
                 qrTarget.innerHTML = qr.createImgTag(5, 5);
