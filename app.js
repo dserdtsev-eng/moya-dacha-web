@@ -641,21 +641,30 @@ qrcode.stringToBytes = function(s) {
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
-    // Очистка от запрещенных символов
+    // Функция для перевода русской строки в Base64 (UTF-8)
+    const toBase64 = (str) => {
+        if (!str) return '';
+        try {
+            return btoa(unescape(encodeURIComponent(str)));
+        } catch (e) {
+            return str;
+        }
+    };
+
     const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
 
-    // Собираем чистую строку ST00012 (без encodeURIComponent и BOM)
+    // Возвращаем строку, где русские поля закодированы в Base64
     return [
         'ST00012',
-        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
+        'Name=' + toBase64(clean(req.name || 'СНТ НАДЕЖДА')),
         'PersonalAcc=' + clean(req.personal_acc),
-        'BankName=' + clean(req.bank_name),
+        'BankName=' + toBase64(clean(req.bank_name)),
         'BIC=' + clean(req.bic),
         'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
         'PayeeINN=' + clean(req.inn),
         'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + clean(purpose)
+        'Purpose=' + toBase64(clean(purpose))
     ].join('|');
 }
 
