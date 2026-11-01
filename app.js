@@ -606,24 +606,30 @@ function renderQRElectro(area, plot, summary) {
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
-    // Очищаем строку от запрещенных символов | и =
-    const clean = (str) => {
+    // Эта функция превращает русские буквы в правильные байты UTF-8
+    const toUtf8 = (str) => {
         if (!str) return '';
-        return String(str).replace(/\|/g, ' ').replace(/=/g, ' ').trim();
+        try {
+            // Магия: переводим строку в UTF-8 байты и обратно в символы
+            return unescape(encodeURIComponent(String(str)));
+        } catch (e) {
+            return String(str);
+        }
     };
 
-    // Формируем строку сразу с русским текстом (без encodeURIComponent)
+    const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
+
     return [
         'ST00012',
-        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
+        'Name=' + toUtf8(clean(req.name || 'СНТ НАДЕЖДА')),
         'PersonalAcc=' + clean(req.personal_acc),
-        'BankName=' + clean(req.bank_name),
+        'BankName=' + toUtf8(clean(req.bank_name)),
         'BIC=' + clean(req.bic),
         'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
         'PayeeINN=' + clean(req.inn),
         'KPP=' + clean(req.kpp),
-        'Sum=' + Math.round(amount * 100), // Сумма строго цифрами
-        'Purpose=' + clean(purpose)
+        'Sum=' + Math.round(amount * 100),
+        'Purpose=' + toUtf8(clean(purpose))
     ].join('|');
 }
 
