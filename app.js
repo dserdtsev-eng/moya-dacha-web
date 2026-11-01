@@ -567,22 +567,23 @@ function renderQRElectro(area, plot, summary) {
 // ─── СБОРКА И СОХРАНЕНИЕ ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
-    const encodeValue = (val) => {
-        if (!val) return '';
-        return encodeURIComponent(String(val).replace(/\|/g, ' ').replace(/=/g, ' ').trim());
-    };
+    
+    // Берем только первые 20 символов названий, чтобы не переполнить QR
+    const shortName = (req.name || 'СНТ').substring(0, 20);
+    const shortBank = (req.bank_name || 'Банк').substring(0, 20);
+    const shortPurpose = purpose.substring(0, 40); // Ограничиваем назначение платежа
 
     return [
         'ST00012',
-        'Name=' + encodeValue(req.name || 'СНТ НАДЕЖДА'),
-        'PersonalAcc=' + encodeValue(req.personal_acc || ''),
-        'BankName=' + encodeValue(req.bank_name || ''),
-        'BIC=' + encodeValue(req.bic || ''),
-        'CorrespAcc=' + encodeValue(req.corr_acc || req.corresp_acc || ''),
-        'PayeeINN=' + encodeValue(req.inn || ''),
-        'KPP=' + encodeValue(req.kpp || ''),
+        'Name=' + encodeURIComponent(shortName),
+        'PersonalAcc=' + (req.personal_acc || ''),
+        'BankName=' + encodeURIComponent(shortBank),
+        'BIC=' + (req.bic || ''),
+        'CorrespAcc=' + (req.corr_acc || req.corresp_acc || ''),
+        'PayeeINN=' + (req.inn || ''),
+        'KPP=' + (req.kpp || ''),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + encodeValue(purpose)
+        'Purpose=' + encodeURIComponent(shortPurpose)
     ].join('|');
 }
 
