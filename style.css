@@ -95,7 +95,11 @@ body {
 .tab-btn.active { border-bottom-color: var(--primary); }
 
 /* Контент */
-.tab-content { flex: 1; }
+.tab-content { 
+    flex: 1; 
+    overflow-y: auto; /* Разрешаем прокрутку контента */
+    min-height: 0;    /* Важно для flex-контейнеров, чтобы они не раздувались */
+}
 h3 { font-size: 20px; margin-bottom: 15px; font-weight: bold; }
 
 .card {
