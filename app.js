@@ -618,9 +618,10 @@ function buildPaymentQR(plot, amount, purpose) {
             const char = str[i];
             const code = win1251Map[char];
             if (code !== undefined) {
+                // Превращаем код в символ (байт), который библиотека закодирует как есть
                 result += String.fromCharCode(code);
             } else {
-                result += char;
+                result += char; // Цифры и латиница остаются
             }
         }
         return result;
@@ -628,8 +629,9 @@ function buildPaymentQR(plot, amount, purpose) {
 
     const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
 
+    // ВАЖНО: Используем ST00011 (версия с Windows-1251) вместо ST00012 (UTF-8)
     return [
-        'ST00011', // ВАЖНО: 11 (Windows-1251), а не 12 (UTF-8)
+        'ST00011',
         'Name=' + toWin1251(clean(req.name || 'СНТ НАДЕЖДА')),
         'PersonalAcc=' + clean(req.personal_acc),
         'BankName=' + toWin1251(clean(req.bank_name)),
