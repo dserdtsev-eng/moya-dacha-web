@@ -43,10 +43,14 @@ async function loadData(isRefresh = false) {
         appData = await response.json();
         
         if (isRefresh && currentPlot) {
+            // Обновляем данные текущего участка без выхода на экран логина
             currentPlot.data = appData.plots[currentPlot.id];
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                if (btn.classList.contains('active')) renderTab(btn.dataset.tab);
+                if (btn.classList.contains('active')) {
+                    renderTab(btn.dataset.tab);
+                }
             });
+            // Короткое уведомление об обновлении
             const toast = document.createElement('div');
             toast.textContent = 'Данные обновлены';
             toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--primary);color:white;padding:10px 20px;border-radius:20px;z-index:1000;';
@@ -55,6 +59,7 @@ async function loadData(isRefresh = false) {
         } else {
             initLoginScreen();
             showScreen('login-screen');
+            
             const savedPlotId = localStorage.getItem('snt_plot_id');
             if (savedPlotId && appData.plots[savedPlotId]) {
                 document.getElementById('street-select').value = appData.plots[savedPlotId].street;
@@ -146,16 +151,14 @@ function renderDashboard() {
     document.getElementById('user-name').textContent = plot.owner || 'Участок';
     document.getElementById('user-address').textContent = `${plot.street} ${plot.house}`;
 
-    const tabs = document.querySelectorAll('.tab-btn');
-    for (let i = 0; i < tabs.length; i++) {
-        tabs[i].onclick = function() {
-            for (let j = 0; j < tabs.length; j++) {
-                tabs[j].classList.remove('active');
-            }
-            this.classList.add('active');
-            renderTab(this.dataset.tab);
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderTab(btn.dataset.tab);
         };
-    }
+    });
+
     renderTab('debts');
 }
 
@@ -270,6 +273,7 @@ function getElectricSummary(plot) {
     
     return { lastVal, consumed, paidKwh, balance: paidKwh - consumed };
 }
+
 // ─── РЕНДЕР ВКЛАДОК ───
 function renderTab(tab) {
     const content = document.getElementById('tab-content');
@@ -279,6 +283,7 @@ function renderTab(tab) {
 
     if (tab === 'debts') {
         const totalDebt = getTotalDebt(plot, plotId);
+
         let html = '<h3>Задолженности</h3>';
         if (totalDebt === 0) {
             html += '<div class="card card-blue" style="text-align:center; font-size:18px; font-weight:bold; padding:30px 20px;">✓ Задолженностей по взносам нет</div>';
@@ -296,10 +301,14 @@ function renderTab(tab) {
     }
     
     else if (tab === 'payments') {
-        const payments = (appData.payments || []).filter(p => String(p.plot) === String(plotId)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        const payments = (appData.payments || [])
+            .filter(p => String(p.plot) === String(plotId))
+            .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
         let html = '<h3>История платежей</h3>';
-        if (payments.length === 0) html += '<p>Платежей пока нет</p>';
-        else {
+        if (payments.length === 0) {
+            html += '<p>Платежей пока нет</p>';
+        } else {
             payments.forEach(p => {
                 let periodText = p.period === 'prev' ? 'прошлый период' : (p.period === 'current' ? 'текущий период' : '');
                 html += `
@@ -310,17 +319,22 @@ function renderTab(tab) {
                             <span style="font-size: 20px; color: var(--primary);">${formatMoney(Number(p.amount))}</span>
                         </div>
                         ${periodText ? `<div style="font-size: 14px; color: var(--text-light); margin-top: 5px;">${periodText}</div>` : ''}
-                    </div>`;
+                    </div>
+                `;
             });
         }
         content.innerHTML = html;
     }
 
     else if (tab === 'readings') {
-        const readings = (plot.meter_readings || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        const readings = (plot.meter_readings || [])
+            .slice()
+            .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
         let html = '<h3>Показания счётчиков</h3>';
-        if (readings.length === 0) html += '<p>Показаний пока нет</p>';
-        else {
+        if (readings.length === 0) {
+            html += '<p>Показаний пока нет</p>';
+        } else {
             readings.forEach(r => {
                 const val = r.values && r.values["1"] !== undefined ? r.values["1"] : '—';
                 html += `
@@ -330,7 +344,8 @@ function renderTab(tab) {
                             <span style="font-size: 18px;">Счётчик</span>
                             <span style="font-size: 20px; font-weight: bold;">${val}</span>
                         </div>
-                    </div>`;
+                    </div>
+                `;
             });
         }
         content.innerHTML = html;
@@ -342,6 +357,7 @@ function renderTab(tab) {
 
         let html = '<h3>Электричество</h3>';
         html += `<div style="color: var(--text-light); margin-bottom: 15px;">Период: с ${lastRepl ? formatDateRu(lastRepl) : 'начала'} (после замены счётчика)</div>`;
+
         html += `<div class="card">
             <h4 style="font-size: 18px; margin-bottom: 15px;">Баланс</h4>
             <div class="row"><span>Оплачено, кВт·ч</span><span>${summary.paidKwh.toFixed(1)}</span></div>
@@ -355,8 +371,9 @@ function renderTab(tab) {
         const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
         const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a,b) => b.date.localeCompare(a.date));
         
-        if (ePayments.length === 0) html += '<p>Платежей за электричество нет</p>';
-        else {
+        if (ePayments.length === 0) {
+            html += '<p>Платежей за электричество нет</p>';
+        } else {
             ePayments.forEach(p => {
                 let tPrice = 0;
                 for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
@@ -373,9 +390,14 @@ function renderTab(tab) {
         content.innerHTML = html;
     }
 
+    else if (tab === 'qr') {
+        renderQRTab(plot, plotId, content);
+    }
+
     else if (tab === 'deadlines') {
         const feeStart = settings.fee_start_date || '—';
         const feeEnd = feeStart !== '—' ? addYearMinusDay(feeStart) : '—';
+        
         let html = '<h3>Сроки оплаты</h3>';
         
         if (Number(settings.member_fee) > 0) {
@@ -385,6 +407,7 @@ function renderTab(tab) {
                 <div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.member_deadline) || 'не указан'}</span></div>
             </div>`;
         }
+        
         if (Number(settings.target_fee) > 0) {
             html += `<div class="card">
                 <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Годовой целевой взнос</div>
@@ -392,20 +415,19 @@ function renderTab(tab) {
                 <div class="row" style="padding: 5px 0;"><span>Срок:</span><span>${formatDateRu(settings.target_deadline) || 'не указан'}</span></div>
             </div>`;
         }
+
         html += `<div class="card">
             <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Электроэнергия</div>
             <div class="row" style="padding: 5px 0;"><span>Срок:</span><span>до ${settings.electric_day} числа каждого месяца</span></div>
         </div>`;
+
         html += `<div class="card">
             <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Период взносов</div>
             <div class="row" style="padding: 5px 0;"><span>С:</span><span>${formatDateRu(feeStart)}</span></div>
             <div class="row" style="padding: 5px 0;"><span>По:</span><span>${formatDateRu(feeEnd)}</span></div>
         </div>`;
-        content.innerHTML = html;
-    }
 
-    else if (tab === 'qr') {
-        renderQRTab(plot, plotId, content);
+        content.innerHTML = html;
     }
 }
 
@@ -419,11 +441,14 @@ function renderQRTab(plot, plotId, content) {
             <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">Участок: ${plot.street} ${plot.house}</div>
             <div style="font-size: 18px; color: var(--text-light);">Владелец: ${plot.owner || '—'}</div>
         </div>
+        
         <h3 style="margin-top: 10px;">За что платим?</h3>
+        
         <div style="display: flex; gap: 10px; margin-bottom: 20px;">
             <button id="qr-btn-vznos" class="btn-pill" style="flex: 1; background: var(--primary); color: white;">Взносы</button>
             <button id="qr-btn-electro" class="btn-pill" style="flex: 1; background: white; color: var(--text); border: 1px solid var(--border);">Электро</button>
         </div>
+
         <div id="qr-content-area"></div>
     `;
     content.innerHTML = html;
@@ -434,18 +459,27 @@ function renderQRTab(plot, plotId, content) {
 
     function setActiveTab(isVznos) {
         if (isVznos) {
-            btnVznos.style.background = 'var(--primary)'; btnVznos.style.color = 'white'; btnVznos.style.border = 'none';
-            btnElectro.style.background = 'white'; btnElectro.style.color = 'var(--text)'; btnElectro.style.border = '1px solid var(--border)';
+            btnVznos.style.background = 'var(--primary)';
+            btnVznos.style.color = 'white';
+            btnVznos.style.border = 'none';
+            btnElectro.style.background = 'white';
+            btnElectro.style.color = 'var(--text)';
+            btnElectro.style.border = '1px solid var(--border)';
             renderQRVznos(area, plot, totalDebt);
         } else {
-            btnElectro.style.background = 'var(--primary)'; btnElectro.style.color = 'white'; btnElectro.style.border = 'none';
-            btnVznos.style.background = 'white'; btnVznos.style.color = 'var(--text)'; btnVznos.style.border = '1px solid var(--border)';
+            btnElectro.style.background = 'var(--primary)';
+            btnElectro.style.color = 'white';
+            btnElectro.style.border = 'none';
+            btnVznos.style.background = 'white';
+            btnVznos.style.color = 'var(--text)';
+            btnVznos.style.border = '1px solid var(--border)';
             renderQRElectro(area, plot, summary);
         }
     }
 
     btnVznos.onclick = () => setActiveTab(true);
     btnElectro.onclick = () => setActiveTab(false);
+
     setActiveTab(true);
 }
 
@@ -454,11 +488,13 @@ function renderQRVznos(area, plot, totalDebt) {
     if (totalDebt <= 0) {
         area.innerHTML = `
             <div class="card card-blue" style="text-align: center; font-size: 20px; padding: 30px 20px;">
-                Сумма к оплате<br><br><span style="font-size: 32px; font-weight: bold;">0,00 ₽</span>
+                Сумма к оплате<br><br>
+                <span style="font-size: 32px; font-weight: bold;">0,00 ₽</span>
             </div>
             <div class="card" style="text-align: center; font-size: 18px; color: var(--text-light); padding: 30px 20px;">
                 Нет задолженности по взносам
-            </div>`;
+            </div>
+        `;
         return;
     }
 
@@ -469,10 +505,11 @@ function renderQRVznos(area, plot, totalDebt) {
         </div>
         <div style="text-align: center; margin-top: 20px;" id="qr-wrapper">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
-            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
             <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
-        </div>`;
+        </div>
+    `;
 
     const purpose = `${plot.street} ${plot.house}, взносы`;
     const qrData = buildPaymentQR(plot, totalDebt, purpose);
@@ -480,12 +517,8 @@ function renderQRVznos(area, plot, totalDebt) {
     setTimeout(() => {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
-            qrTarget.innerHTML = '';
             new QRCode(qrTarget, {
-                text: qrData,
-                width: 240,
-                height: 240,
-                correctLevel: QRCode.CorrectLevel.M
+                text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
             });
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
@@ -506,17 +539,20 @@ function renderQRElectro(area, plot, summary) {
             <div class="row"><span>Расход: <span id="qr-delta">0</span> кВт·ч</span></div>
             <div class="row"><span>Тариф: ${Number(currentTariff).toFixed(2)} ₽/кВт·ч</span></div>
         </div>
+        
         <div class="card card-blue" style="text-align: center; padding: 20px;">
             <div style="font-size: 18px;">Сумма к оплате</div>
             <div id="qr-electro-sum" style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">0,00 ₽</div>
             <div id="qr-electro-err" style="color: var(--error); font-size: 16px; margin-top: 10px; display: none;">Введите показание больше предыдущего</div>
         </div>
+        
         <div id="qr-electro-block" style="text-align: center; margin-top: 20px; display: none;">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
-            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
+            <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
             <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
-        </div>`;
+        </div>
+    `;
 
     const input = document.getElementById('qr-electro-input');
     const deltaSpan = document.getElementById('qr-delta');
@@ -529,19 +565,22 @@ function renderQRElectro(area, plot, summary) {
         const prev = summary.lastVal;
         
         if (isNaN(val) || val <= prev) {
-            deltaSpan.textContent = '0'; sumDiv.textContent = '0,00 ₽';
-            errDiv.style.display = val > 0 ? 'block' : 'none'; qrBlock.style.display = 'none';
+            deltaSpan.textContent = '0';
+            sumDiv.textContent = '0,00 ₽';
+            errDiv.style.display = val > 0 ? 'block' : 'none';
+            qrBlock.style.display = 'none';
             return;
         }
 
         errDiv.style.display = 'none';
         const delta = val - prev;
         const sum = delta * currentTariff;
+        
         deltaSpan.textContent = delta.toFixed(1);
         sumDiv.textContent = formatMoney(sum);
         qrBlock.style.display = 'block';
 
-        const purpose = `${plot.street} ${plot.house}, электроэнергия, показание: ${val}`;
+        const purpose = `${plot.street} ${plot.house}, электроэнергия`;
         const qrData = buildPaymentQR(plot, sum, purpose);
 
         setTimeout(() => {
@@ -549,10 +588,7 @@ function renderQRElectro(area, plot, summary) {
             if (qrTarget) {
                 qrTarget.innerHTML = '';
                 new QRCode(qrTarget, {
-                    text: qrData,
-                    width: 240,
-                    height: 240,
-                    correctLevel: QRCode.CorrectLevel.M
+                    text: qrData, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M
                 });
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
@@ -560,24 +596,20 @@ function renderQRElectro(area, plot, summary) {
     };
 }
 
-// ─── СБОРКА И СОХРАНЕНИЕ ───
+// ─── ГЕНЕРАЦИЯ И СОХРАНЕНИЕ QR ───
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
-    
-    // Очищаем от запрещенных символов | и =
-    const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
-    
     return [
         'ST00012',
-        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
-        'PersonalAcc=' + clean(req.personal_acc),
-        'BankName=' + clean(req.bank_name),
-        'BIC=' + clean(req.bic),
-        'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
-        'PayeeINN=' + clean(req.inn),
-        'KPP=' + clean(req.kpp),
+        'Name=' + (req.name || 'СНТ НАДЕЖДА'),
+        'PersonalAcc=' + (req.personal_acc || ''),
+        'BankName=' + (req.bank_name || ''),
+        'BIC=' + (req.bic || ''),
+        'CorrespAcc=' + (req.corresp_acc || ''),
+        'PayeeINN=' + (req.inn || ''),
+        'KPP=' + (req.kpp || ''),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + clean(purpose)
+        'Purpose=' + purpose
     ].join('|');
 }
 
@@ -585,22 +617,30 @@ function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
-    // Библиотека qrcodejs может рисовать либо в canvas, либо в img
     const canvas = container.querySelector('canvas');
     const img = container.querySelector('img');
-    let dataUrl = '';
 
+    let dataUrl = '';
+    // Если библиотека отрисовала canvas (в современных браузерах) - берем его
     if (canvas) {
         dataUrl = canvas.toDataURL("image/png");
-    } else if (img && img.src) {
+    } 
+    // Если отрисовала img (в некоторых браузерах)
+    else if (img && img.src) {
         dataUrl = img.src;
     }
 
-    if (!dataUrl) { alert('QR-код ещё не готов.'); return; }
+    if (!dataUrl || dataUrl === 'data:,') {
+        alert('QR-код ещё не сгенерирован. Подождите секунду и попробуйте снова.');
+        return;
+    }
 
+    // Создаем виртуальную ссылку для скачивания
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `QR_${currentPlot.data.street}_${currentPlot.data.house}.png`;
+    const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
+    const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
+    a.download = `QR_${street}_${house}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -614,7 +654,9 @@ document.getElementById('logout-btn').onclick = () => {
     showScreen('login-screen');
 };
 
-document.getElementById('refresh-btn').onclick = () => { loadData(true); };
+document.getElementById('refresh-btn').onclick = () => {
+    loadData(true); // true = обновить без выхода на экран логина
+};
 
 document.getElementById('info-btn').onclick = () => {
     alert(`Моя дача — СНТ «Надежда»\n\n` + 
