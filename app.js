@@ -146,13 +146,16 @@ function renderDashboard() {
     document.getElementById('user-name').textContent = plot.owner || 'Участок';
     document.getElementById('user-address').textContent = `${plot.street} ${plot.house}`;
 
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            renderTab(btn.dataset.tab);
+    const tabs = document.querySelectorAll('.tab-btn');
+    for (let i = 0; i < tabs.length; i++) {
+        tabs[i].onclick = function() {
+            for (let j = 0; j < tabs.length; j++) {
+                tabs[j].classList.remove('active');
+            }
+            this.classList.add('active');
+            renderTab(this.dataset.tab);
         };
-    });
+    }
     renderTab('debts');
 }
 
@@ -405,6 +408,7 @@ function renderTab(tab) {
         renderQRTab(plot, plotId, content);
     }
 }
+
 // ─── ВКЛАДКА «QR» ───
 function renderQRTab(plot, plotId, content) {
     let totalDebt = getTotalDebt(plot, plotId);
@@ -477,16 +481,12 @@ function renderQRVznos(area, plot, totalDebt) {
         const qrTarget = document.getElementById('qr-target');
         if (qrTarget) {
             qrTarget.innerHTML = '';
-            const qr = qrcode(10, '3');
-            qr.addData(qrData);
-            qr.make();
-            qrTarget.innerHTML = qr.createImgTag(5, 5);
-            const img = qrTarget.querySelector('img');
-            if (img) { 
-                img.style.width = '240px'; 
-                img.style.height = '240px'; 
-                img.style.display = 'block'; 
-            }
+            new QRCode(qrTarget, {
+                text: qrData,
+                width: 240,
+                height: 240,
+                correctLevel: QRCode.CorrectLevel.M
+            });
             document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
         }
     }, 100);
@@ -548,16 +548,12 @@ function renderQRElectro(area, plot, summary) {
             const qrTarget = document.getElementById('qr-target');
             if (qrTarget) {
                 qrTarget.innerHTML = '';
-                const qr = qrcode(10, '3');
-                qr.addData(qrData);
-                qr.make();
-                qrTarget.innerHTML = qr.createImgTag(5, 5);
-                const img = qrTarget.querySelector('img');
-                if (img) { 
-                    img.style.width = '240px'; 
-                    img.style.height = '240px'; 
-                    img.style.display = 'block'; 
-                }
+                new QRCode(qrTarget, {
+                    text: qrData,
+                    width: 240,
+                    height: 240,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
                 document.getElementById('save-qr-btn').onclick = () => saveQRToGallery('qr-target');
             }
         }, 100);
@@ -568,36 +564,43 @@ function renderQRElectro(area, plot, summary) {
 function buildPaymentQR(plot, amount, purpose) {
     const req = appData.settings.requisites || {};
     
-    // Берем только первые 20 символов названий, чтобы не переполнить QR
-    const shortName = (req.name || 'СНТ').substring(0, 20);
-    const shortBank = (req.bank_name || 'Банк').substring(0, 20);
-    const shortPurpose = purpose.substring(0, 40); // Ограничиваем назначение платежа
-
+    // Очищаем от запрещенных символов | и =
+    const clean = (str) => String(str || '').replace(/\|/g, ' ').replace(/=/g, ' ').trim();
+    
     return [
         'ST00012',
-        'Name=' + encodeURIComponent(shortName),
-        'PersonalAcc=' + (req.personal_acc || ''),
-        'BankName=' + encodeURIComponent(shortBank),
-        'BIC=' + (req.bic || ''),
-        'CorrespAcc=' + (req.corr_acc || req.corresp_acc || ''),
-        'PayeeINN=' + (req.inn || ''),
-        'KPP=' + (req.kpp || ''),
+        'Name=' + clean(req.name || 'СНТ НАДЕЖДА'),
+        'PersonalAcc=' + clean(req.personal_acc),
+        'BankName=' + clean(req.bank_name),
+        'BIC=' + clean(req.bic),
+        'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc),
+        'PayeeINN=' + clean(req.inn),
+        'KPP=' + clean(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + encodeURIComponent(shortPurpose)
+        'Purpose=' + clean(purpose)
     ].join('|');
 }
 
 function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
+    
+    // Библиотека qrcodejs может рисовать либо в canvas, либо в img
+    const canvas = container.querySelector('canvas');
     const img = container.querySelector('img');
-    if (!img || !img.src) { alert('QR-код ещё не готов. Подождите секунду.'); return; }
+    let dataUrl = '';
+
+    if (canvas) {
+        dataUrl = canvas.toDataURL("image/png");
+    } else if (img && img.src) {
+        dataUrl = img.src;
+    }
+
+    if (!dataUrl) { alert('QR-код ещё не готов.'); return; }
 
     const a = document.createElement('a');
-    a.href = img.src;
-    const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
-    const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
-    a.download = `QR_${street}_${house}.png`;
+    a.href = dataUrl;
+    a.download = `QR_${currentPlot.data.street}_${currentPlot.data.house}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
