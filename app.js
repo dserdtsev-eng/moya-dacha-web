@@ -624,39 +624,27 @@ function buildPaymentQR(plot, amount, purpose) {
     ].join('|');
 }
 
-async function saveQRToGallery(containerId) {
+function saveQRToGallery(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
+    // Ищем картинку внутри контейнера
     const img = container.querySelector('img');
     if (!img || !img.src) {
-        alert('QR-код ещё не сгенерирован.');
+        alert('QR-код ещё не сгенерирован. Подождите секунду.');
         return;
     }
 
-    try {
-        // Скачиваем картинку как файл (чтобы обойти ограничения браузера)
-        const response = await fetch(img.src);
-        const blob = await response.blob();
-        
-        // Создаем ссылку на скачивание
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
-        const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
-        a.download = `QR_${street}_${house}.png`;
-        
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        // Очищаем память
-        window.URL.revokeObjectURL(url);
-    } catch (e) {
-        console.error(e);
-        alert('Не удалось сохранить QR-код. Попробуйте сделать скриншот экрана.');
-    }
+    // Создаем ссылку для скачивания прямо из data:image (без fetch)
+    const a = document.createElement('a');
+    a.href = img.src;
+    const street = currentPlot.data.street ? currentPlot.data.street.replace(/\s+/g, '_') : 'Участок';
+    const house = currentPlot.data.house ? currentPlot.data.house.replace(/\s+/g, '_') : '';
+    a.download = `QR_${street}_${house}.png`;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 // ─── ОБРАБОТЧИКИ ШАПКИ ───
