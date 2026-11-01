@@ -625,19 +625,23 @@ function buildPaymentQR(plot, amount, purpose) {
         return s;
     };
     
-    // ВАЖНО: оставляем русский текст как есть (без encodeURIComponent),
-    // но сильно режем длину, чтобы библиотека не падала.
+    // Функция для правильного перевода русских букв в UTF-8
+    const encodeValue = (val) => {
+        if (!val) return '';
+        return encodeURIComponent(String(val).replace(/\|/g, ' ').replace(/=/g, ' ').trim());
+    };
+
     return [
         'ST00012',
-        'Name=' + clean(req.name || 'СНТ НАДЕЖДА', 20),
-        'PersonalAcc=' + clean(req.personal_acc, 20),
-        'BankName=' + clean(req.bank_name, 15), // Режем банк до 15 символов
-        'BIC=' + clean(req.bic, 9),
-        'CorrespAcc=' + clean(req.corr_acc || req.corresp_acc, 20),
-        'PayeeINN=' + clean(req.inn, 12),
-        'KPP=' + clean(req.kpp, 9),
+        'Name=' + encodeValue(req.name || 'СНТ НАДЕЖДА'),
+        'PersonalAcc=' + encodeValue(req.personal_acc),
+        'BankName=' + encodeValue(req.bank_name),
+        'BIC=' + encodeValue(req.bic),
+        'CorrespAcc=' + encodeValue(req.corr_acc || req.corresp_acc),
+        'PayeeINN=' + encodeValue(req.inn),
+        'KPP=' + encodeValue(req.kpp),
         'Sum=' + Math.round(amount * 100),
-        'Purpose=' + clean(purpose, 30) // Режем назначение до 30 символов
+        'Purpose=' + encodeValue(purpose)
     ].join('|');
 }
 
