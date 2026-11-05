@@ -461,11 +461,11 @@ function makeQRInto(containerId, data) {
 
 // ─── РЕНДЕР QR ДЛЯ ВЗНОСОВ ───
 function renderQRVznos(area, plot, totalDebt) {
-    // Принудительно превращаем в число и округляем до копеек
+    // Округляем до копеек
     const debt = Math.round(Number(totalDebt) * 100) / 100;
 
-    // Если долг 0 или меньше — показываем заглушку и ЖЕСТКО выходим
-    if (debt <= 0) {
+    // Если долга нет — показываем заглушку (ввод суммы тоже не нужен)
+    if (debt < 0.01) {
         area.innerHTML = `
             <div class="card card-blue" style="text-align: center; padding: 20px;">
                 <div style="font-size: 18px;">Сумма к оплате</div>
@@ -475,28 +475,60 @@ function renderQRVznos(area, plot, totalDebt) {
                 Нет задолженности по взносам
             </div>
         `;
-        return; // <--- ГЕНЕРАЦИЯ QR НЕ ЗАПУСТИТСЯ
+        return;
     }
 
-    // Генерация QR (сработает только если есть долг)
+    // Отрисовываем интерфейс с полем ввода
     area.innerHTML = `
-        <div class="card card-blue" style="text-align: center; padding: 20px;">
-            <div style="font-size: 18px;">Сумма к оплате</div>
-            <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-top: 10px;">${formatMoney(debt)}</div>
+        <div class="card">
+            <div style="font-size: 18px; margin-bottom: 15px;">Сумма к оплате:</div>
+            <input type="number" id="qr-vznos-input" class="input-large" placeholder="Сумма" value="${debt.toFixed(2)}">
+            <div class="row" style="margin-top: 15px;"><span>К оплате:</span><span id="qr-vznos-display">${formatMoney(debt)}</span></div>
+            <div id="qr-vznos-err" style="color: var(--error); font-size: 14px; margin-top: 10px; display: none;">Сумма должна быть больше 0</div>
         </div>
-        <div style="text-align: center; margin-top: 20px;">
+
+        <div id="qr-vznos-block" style="text-align: center; margin-top: 20px;">
             <h4 style="font-size: 20px; margin-bottom: 15px;">QR-код для оплаты</h4>
             <div id="qr-target" style="display: flex; justify-content: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 12px; min-height: 240px;"></div>
             <p style="color: var(--text-light); font-size: 16px; margin-bottom: 20px;">Откройте приложение банка →<br>«Оплата по QR» → наведите камеру</p>
             <button id="save-qr-btn" class="btn-pill" style="background: var(--primary); color: white; margin-bottom: 10px;">💾 Сохранить QR в галерею</button>
         </div>
     `;
-    
-    const qrData = buildPaymentQR(plot, debt, `${plot.street} ${plot.house}, взносы`);
-    if (makeQRInto('qr-target', qrData)) {
-        const btn = document.getElementById('save-qr-btn');
-        if (btn) btn.onclick = () => saveQRToGallery('qr-target');
+
+    const input = document.getElementById('qr-vznos-input');
+    const display = document.getElementById('qr-vznos-display');
+    const errDiv = document.getElementById('qr-vznos-err');
+    const qrBlock = document.getElementById('qr-vznos-block');
+
+    // Функция обновления суммы и генерации QR
+    function updateQR() {
+        const val = parseFloat(input.value);
+        
+        // Проверка: сумма должна быть больше 0 (верхней границы больше нет)
+        if (isNaN(val) || val <= 0) {
+            errDiv.style.display = 'block';
+            qrBlock.style.display = 'none';
+            display.textContent = '0,00 ₽';
+            return;
+        }
+
+        errDiv.style.display = 'none';
+        qrBlock.style.display = 'block';
+        display.textContent = formatMoney(val);
+
+        const qrData = buildPaymentQR(plot, val, `${plot.street} ${plot.house}, взносы`);
+        if (makeQRInto('qr-target', qrData)) {
+            const btn = document.getElementById('save-qr-btn');
+            if (btn) btn.onclick = () => saveQRToGallery('qr-target');
+        }
     }
+
+    // Слушатели событий
+    input.addEventListener('focus', function() { this.select(); });
+    input.addEventListener('input', updateQR);
+
+    // Первичная генерация при открытии
+    updateQR();
 }
 
 // ─── РЕНДЕР QR ДЛЯ ЭЛЕКТРО ───
