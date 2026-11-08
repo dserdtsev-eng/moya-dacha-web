@@ -268,7 +268,7 @@ function getElectricSummary(plot) {
     const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
     for (const p of (appData.payments || [])) {
         if (String(p.plot) !== String(plot.id) || !isElectricPayment(p.description)) continue;
-        if (lastRepl && p.date < lastRepl) continue;
+        if (lastRepl && p.date <= lastRepl) continue;
         let tPrice = 0;
         for (const t of tariffs) { if (t.date <= p.date) tPrice = t.price; }
         if (tPrice > 0) paidKwh += (Number(p.amount) / tPrice);
@@ -357,7 +357,7 @@ function renderTab(tab) {
             
             html += `<h4 style="font-size: 18px; margin-top: 25px; margin-bottom: 15px;">Оплаченные кВт·ч</h4>`;
             const tariffs = (appData.tariffs || []).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-            const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).sort((a,b) => b.date.localeCompare(a.date));
+            const ePayments = (appData.payments || []).filter(p => String(p.plot) === String(plotId) && isElectricPayment(p.description)).filter(p => !lastRepl || p.date > lastRepl).sort((a,b) => b.date.localeCompare(a.date));
             if (ePayments.length === 0) html += '<p>Платежей за электричество нет</p>';
             else ePayments.forEach(p => {
                 let tPrice = 0;
